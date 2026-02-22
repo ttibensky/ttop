@@ -1,0 +1,30 @@
+---
+description: Project workflow — testing, linting, docs updates after code changes
+alwaysApply: true
+---
+
+# Workflow
+
+## After Code Changes
+
+Before reporting that a task is complete, always run:
+
+```bash
+cargo clippy --tests
+cargo test
+```
+
+Both must pass with zero warnings and zero failures. Fix any issues before finishing.
+
+## Tests
+
+- Add or update tests for every new feature, bug fix, or behavioral change.
+- Unit tests go in `#[cfg(test)] mod tests { ... }` blocks inside the source file they test.
+- Integration tests go in `tests/*.rs` files.
+- Aim for coverage of edge cases, boundary values, and error conditions — not just the happy path.
+
+## Documentation
+
+- Update `README.md` when adding user-facing features, new dependencies, or changes to build/run instructions.
+- Update files in `docs/` (architecture, UI design, roadmap) when making architectural changes, adding new data sources, or changing the UI layout/behavior.
+- Keep the roadmap phases current — mark completed items and add new ones as scope evolves.

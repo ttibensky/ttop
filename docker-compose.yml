@@ -1,0 +1,14 @@
+services:
+  ttop:
+    build: .
+    container_name: ttop
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/app
+      # - cargo-registry:/root/.cargo/registry
+      - target-cache:/app/target
+
+volumes:
+  # cargo-registry:
+  target-cache:

@@ -1,0 +1,57 @@
+---
+description: Rust coding conventions and best practices
+globs: "**/*.rs"
+alwaysApply: false
+---
+
+# Rust Conventions
+
+## Error Handling
+
+- Never use `.unwrap()` or `.expect()` in non-test code unless the invariant is provably guaranteed. Prefer `?` propagation or explicit error handling.
+- Use `.unwrap()` and `.expect()` freely in test code for clarity.
+- Return `Result` or `Option` from functions that can fail.
+
+## Arithmetic Safety
+
+- Use `saturating_sub`, `saturating_add`, `checked_mul`, etc. for counters and indices that could overflow or underflow.
+- Never rely on wrapping arithmetic unless intentional.
+
+## Naming
+
+- Types and traits: `PascalCase`
+- Functions, methods, variables: `snake_case`
+- Constants: `SCREAMING_SNAKE_CASE`
+- Prefer descriptive names. Abbreviations are acceptable when they are domain-standard (e.g., `pct`, `cpu`, `irq`).
+
+## Ownership and Borrowing
+
+- Prefer borrowing (`&T`, `&mut T`) over cloning unless ownership transfer is required.
+- Use `&str` in function parameters instead of `String` when the function doesn't need ownership.
+- Avoid unnecessary `clone()` calls — they are a code smell unless justified.
+
+## Structure
+
+- Keep `main.rs` thin — it should only contain setup, teardown, and the main loop. Push all testable logic into library modules.
+- One concern per module. Data parsing in `cpu.rs`, rendering in `ui.rs`, etc.
+- Mark items `pub` only when needed by other modules. Default to private visibility.
+
+## Style
+
+- No dead code — remove unused functions, imports, and variables.
+- No commented-out code in committed code.
+- Prefer iterators and combinators (`.map()`, `.filter()`, `.collect()`) over manual loops when they improve clarity.
+- Use `match` over chains of `if/else if` when matching on enums or discrete values.
+- Destructure structs and tuples when it improves readability.
+
+## Performance
+
+- Prefer `&str` over `String` for read-only string operations.
+- Use `String::with_capacity()` when building strings of known or estimable size.
+- Avoid allocations in hot loops (the 1-second render cycle). Pre-allocate buffers and reuse them.
+
+## Dependencies
+
+- Minimal external crates. Currently only `crossterm` is allowed.
+- Read system data from `/proc/` and `/sys/` directly — no system monitoring crates.
+- Justify any new dependency before adding it.
