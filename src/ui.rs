@@ -78,10 +78,10 @@ pub fn left_chart_width(half_cols: usize, lw: usize) -> usize {
 }
 
 /// Compute the chart width for the right (temperature) half.
-/// Layout: " " + label + " " + chart + " " + "NNN°C (NNN°F)" + " │"
-///          1  + tlw   + 1   + cw    + 1   + 14               + 2  = tlw + cw + 19
+/// Layout: " " + label + " " + chart + " NNN°C (NNN°F)" + " │"
+///          1  + tlw   + 1   + cw    + 14                + 2  = tlw + cw + 18
 pub fn right_chart_width(half_cols: usize, tlw: usize) -> usize {
-    let fixed = tlw + 19;
+    let fixed = tlw + 18;
     if half_cols > fixed {
         half_cols - fixed
     } else {
@@ -159,8 +159,8 @@ fn render_temp_row(
     }
 
     // pad + right border
-    // used: 1 + tlw + 1 + cw + 1 + 14 = tlw + cw + 17, plus 2 for " │"
-    let used = 1 + tlw + 1 + cw + 1 + 14;
+    // used: 1 + tlw + 1 + cw + 14 = tlw + cw + 16, plus 2 for " │"
+    let used = 1 + tlw + 1 + cw + 14;
     let pad = half_width.saturating_sub(used + 2);
     for _ in 0..pad {
         buf.push(' ');
@@ -186,7 +186,7 @@ fn render_na_temp_row(buf: &mut String, tlw: usize, cw: usize, half_width: usize
 
     let _ = write!(buf, " {COLOR_DIM_GRAY}N/A°C (N/A°F){COLOR_RESET}");
 
-    let used = 1 + tlw + 1 + cw + 1 + 14;
+    let used = 1 + tlw + 1 + cw + 14;
     let pad = half_width.saturating_sub(used + 2);
     for _ in 0..pad {
         buf.push(' ');
@@ -205,7 +205,7 @@ fn render_horizontal_border(
     if let Some(t) = title {
         let _ = write!(buf, " {COLOR_BOLD_CYAN}{t}{COLOR_RESET}{COLOR_DIM_GRAY} ");
         let title_chars = t.len() + 2;
-        let fill = (width as usize).saturating_sub(4 + title_chars);
+        let fill = (width as usize).saturating_sub(3 + title_chars);
         for _ in 0..fill {
             buf.push('─');
         }

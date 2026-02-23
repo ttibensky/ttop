@@ -179,7 +179,7 @@ fn left_chart_width_very_narrow() {
 #[test]
 fn right_chart_width_standard() {
     let cw = right_chart_width(40, 4);
-    assert_eq!(cw, 40 - 4 - 19);
+    assert_eq!(cw, 40 - 4 - 18);
 }
 
 #[test]
