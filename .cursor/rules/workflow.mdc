@@ -27,7 +27,7 @@ When asking for clarification:
 
 If the request is clear, narrowly scoped, and low-impact, skip this step and proceed directly.
 
-## After Code Changes
+## After Changes
 
 Before reporting that a task is complete, run through this checklist:
 
@@ -37,7 +37,7 @@ Before reporting that a task is complete, run through this checklist:
    - `docs/ui-design.md` — UI layout, rendering behavior, color schemes.
    - `docs/roadmap.md` — mark completed items, add new scope.
    - `README.md` — user-facing features, new dependencies, build/run instructions.
-3. **Lint & test** — both must pass with zero warnings and zero failures:
+3. **Lint & test** — run **only when files in `src/` or `tests/` were changed**. Skip for docs-only or other non-code changes. Both must pass with zero warnings and zero failures:
 
 ```bash
 cargo clippy --tests
