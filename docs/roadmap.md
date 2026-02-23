@@ -82,6 +82,30 @@ Full-width "Memory" section box below the CPU section, with sparkline rows for R
 - Command-line arguments (refresh rate override, disable sections, etc.)
 - Man page or `--help` documentation
 
+## Phase 7: PPA Distribution
+
+Publish ttop as a PPA so users can install it with `sudo apt install ttop`.
+
+### Deliverables
+
+1. **Debian packaging (`debian/` directory)**
+   - `debian/control` — package name (`ttop`), description, architecture (`amd64`), build-deps (`cargo`, `rustc`, `debhelper-compat`)
+   - `debian/rules` — `dh`-based build using `cargo build --release`, install binary to `/usr/bin/ttop`
+   - `debian/changelog` — version tracking in Debian format
+   - `debian/copyright` — machine-readable copyright file (AGPL-3.0)
+   - `debian/install` — maps `target/release/ttop` to `/usr/bin/`
+   - `debian/source/format` — `3.0 (quilt)` or `3.0 (native)`
+2. **Launchpad PPA setup**
+   - Create PPA on Launchpad (e.g., `ppa:ttibensky/ttop`)
+   - GPG key generation and upload to Launchpad / Ubuntu keyserver
+   - Target releases: Ubuntu 24.04 LTS (Noble) and latest non-LTS (currently 25.10 Oracular)
+3. **CI automation (GitHub Actions)**
+   - Workflow triggered on version tag push (e.g., `v*`)
+   - Build source package (`debuild -S`)
+   - Upload to PPA via `dput`
+   - GPG signing key stored as GitHub Actions secret
+4. **README update** — add `apt install` instructions to the Installation section
+
 ## Design Decisions Log
 
 | Decision | Choice | Rationale |
@@ -97,3 +121,4 @@ Full-width "Memory" section box below the CPU section, with sparkline rows for R
 | History depth | Equal to chart width (1 char = 1 second) | 1:1 mapping keeps the mental model simple |
 | Layout | Vertically stacked boxed sections | Clean visual separation, easy to extend with new widgets |
 | Screen mode | Full-screen (alternate buffer) | Clean experience, restores terminal on exit |
+| Package distribution | Launchpad PPA | Native `apt install` experience on Ubuntu; automated builds for multiple releases; no hosting infrastructure needed |
