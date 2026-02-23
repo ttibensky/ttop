@@ -17,7 +17,7 @@ The first milestone — a working full-screen app that displays per-core CPU usa
 
 ## Phase 2: CPU Temperature ✓
 
-Side-by-side layout: utilization sparklines on the left half, temperature sparklines on the right half.
+Three-column layout: utilization sparklines split across two columns (first 2/3), temperature sparklines in the third column (last 1/3).
 
 ### Deliverables
 

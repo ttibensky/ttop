@@ -66,25 +66,25 @@ pub fn temp_label_width(temp: &TempState) -> usize {
     temp.labels().iter().map(|l| l.len()).max().unwrap_or(4).max(3)
 }
 
-/// Compute the chart width for the left (utilization) half.
-/// Layout: "│ " + label + " " + chart + " " + "NNN%" + " │"
-///          2   + lw    + 1   + cw    + 1   + 4      + 2  = lw + cw + 10
-pub fn left_chart_width(half_cols: usize, lw: usize) -> usize {
-    let fixed = lw + 10;
-    if half_cols > fixed {
-        half_cols - fixed
+/// Compute the chart width for a utilization column.
+/// Layout: " " + label + " " + chart + " " + "NNN%" + padding(2)
+///          1  + lw    + 1   + cw    + 1   + 4      + 2  = lw + cw + 9
+pub fn util_chart_width(col_width: usize, lw: usize) -> usize {
+    let fixed = lw + 9;
+    if col_width > fixed {
+        col_width - fixed
     } else {
         8
     }
 }
 
-/// Compute the chart width for the right (temperature) half.
+/// Compute the chart width for the temperature column.
 /// Layout: " " + label + " " + chart + " NNN°C (NNN°F)" + " │"
 ///          1  + tlw   + 1   + cw    + 14                + 2  = tlw + cw + 18
-pub fn right_chart_width(half_cols: usize, tlw: usize) -> usize {
+pub fn temp_chart_width(col_with_border: usize, tlw: usize) -> usize {
     let fixed = tlw + 18;
-    if half_cols > fixed {
-        half_cols - fixed
+    if col_with_border > fixed {
+        col_with_border - fixed
     } else {
         8
     }
@@ -147,6 +147,54 @@ fn render_util_row(
     let used = 2 + lw + 1 + cw + 1 + 4;
     let pad = half_width.saturating_sub(used);
     for _ in 0..pad {
+        buf.push(' ');
+    }
+}
+
+fn render_util_row_inner(
+    buf: &mut String,
+    label: &str,
+    lw: usize,
+    history: &VecDeque<f64>,
+    cw: usize,
+    col_width: usize,
+) {
+    let current_pct = history.back().copied().unwrap_or(0.0);
+    let current_color = utilization_color(current_pct);
+
+    let _ = write!(buf, " {COLOR_WHITE}{:<width$}{COLOR_RESET} ", label, width = lw);
+
+    let data_len = history.len();
+    let empty_slots = cw.saturating_sub(data_len);
+
+    for _ in 0..empty_slots {
+        let _ = write!(buf, "{COLOR_DIM_CHART}▁{COLOR_RESET}");
+    }
+    for &val in history.iter().skip(data_len.saturating_sub(cw)) {
+        let ch = sparkline_char(val);
+        let color = utilization_color(val);
+        let _ = write!(buf, "{color}{ch}{COLOR_RESET}");
+    }
+
+    let _ = write!(buf, " {current_color}{:>3.0}%{COLOR_RESET}", current_pct);
+
+    let used = 1 + lw + 1 + cw + 1 + 4;
+    let pad = col_width.saturating_sub(used);
+    for _ in 0..pad {
+        buf.push(' ');
+    }
+}
+
+fn render_empty_first_col(buf: &mut String, section_width: usize) {
+    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+    let inner = section_width.saturating_sub(1);
+    for _ in 0..inner {
+        buf.push(' ');
+    }
+}
+
+fn render_empty_col(buf: &mut String, col_width: usize) {
+    for _ in 0..col_width {
         buf.push(' ');
     }
 }
@@ -305,110 +353,135 @@ fn render_horizontal_border(
 
 fn render_subtitle_line(
     buf: &mut String,
-    left_title: &str,
-    right_title: &str,
-    left_half: usize,
-    terminal_cols: u16,
+    util_title: &str,
+    temp_title: &str,
+    util_col1: usize,
+    util_col2: usize,
+    temp_col: usize,
 ) {
-    let left_inner = left_half.saturating_sub(1); // exclude left border
-    let right_inner = (terminal_cols as usize).saturating_sub(left_half + 2); // exclude center + right borders
+    let util_span = util_col1 + 1 + util_col2;
+    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+
+    let util_pad = util_span.saturating_sub(util_title.len()) / 2;
+    let util_remaining = util_span.saturating_sub(util_pad + util_title.len());
+    for _ in 0..util_pad {
+        buf.push(' ');
+    }
+    let _ = write!(buf, "{COLOR_BOLD_CYAN}{util_title}{COLOR_RESET}");
+    for _ in 0..util_remaining {
+        buf.push(' ');
+    }
 
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
 
-    let left_pad = left_inner.saturating_sub(left_title.len()) / 2;
-    let left_remaining = left_inner.saturating_sub(left_pad + left_title.len());
-    for _ in 0..left_pad {
+    let temp_pad = temp_col.saturating_sub(temp_title.len()) / 2;
+    let temp_remaining = temp_col.saturating_sub(temp_pad + temp_title.len());
+    for _ in 0..temp_pad {
         buf.push(' ');
     }
-    let _ = write!(buf, "{COLOR_BOLD_CYAN}{left_title}{COLOR_RESET}");
-    for _ in 0..left_remaining {
-        buf.push(' ');
-    }
-
-    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
-
-    let right_pad = right_inner.saturating_sub(right_title.len()) / 2;
-    let right_remaining = right_inner.saturating_sub(right_pad + right_title.len());
-    for _ in 0..right_pad {
-        buf.push(' ');
-    }
-    let _ = write!(buf, "{COLOR_BOLD_CYAN}{right_title}{COLOR_RESET}");
-    for _ in 0..right_remaining {
+    let _ = write!(buf, "{COLOR_BOLD_CYAN}{temp_title}{COLOR_RESET}");
+    for _ in 0..temp_remaining {
         buf.push(' ');
     }
 
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
 }
 
-fn render_separator_line(buf: &mut String, left_half: usize, terminal_cols: u16) {
+fn render_separator_line(
+    buf: &mut String,
+    util_col1: usize,
+    util_col2: usize,
+    temp_col: usize,
+) {
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
-    for _ in 0..left_half.saturating_sub(1) {
+    for _ in 0..util_col1 {
         buf.push(' ');
     }
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
-    let right_inner = (terminal_cols as usize).saturating_sub(left_half + 2);
-    for _ in 0..right_inner {
+    for _ in 0..util_col2 {
+        buf.push(' ');
+    }
+    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+    for _ in 0..temp_col {
         buf.push(' ');
     }
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
 }
 
 pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, cols: u16, rows: u16) -> String {
-    let total_inner = (cols as usize).saturating_sub(2);
-    let left_half = total_inner / 2 + 1; // +1 for the left border │
-    let right_half = (cols as usize).saturating_sub(left_half + 1); // -1 for center separator │
+    // 3-column layout: │ util_col1 │ util_col2 │ temp_col │
+    let available = (cols as usize).saturating_sub(4);
+    let util_total = (available * 2) / 3;
+    let temp_col = available - util_total;
+    let util_col1 = util_total / 2;
+    let util_col2 = util_total - util_col1;
+
+    let first_section = util_col1 + 1; // includes left │
+    let third_section = temp_col + 1; // includes right │
 
     let lw = label_width(cpu.core_count());
-    let lcw = left_chart_width(left_half, lw);
+    let ucw = util_chart_width(util_col1, lw);
 
     let tlw = temp_label_width(temp);
-    let rcw = right_chart_width(right_half, tlw);
+    let tcw = temp_chart_width(third_section, tlw);
 
-    let row_count = cpu.core_count();
+    let core_count = cpu.core_count();
+    let half = core_count.div_ceil(2);
     let temp_rows = if temp.available() {
         temp.sensor_count()
     } else {
-        1 // N/A row
+        1
     };
+    let row_count = half.max(temp_rows);
 
     let mut buf = String::with_capacity((cols as usize) * (rows as usize));
     buf.push_str("\x1b[H");
 
-    // CPU section top border
     render_horizontal_border(&mut buf, '╭', '╮', cols, Some("CPU"));
-    render_subtitle_line(&mut buf, "Utilization", "Temperature", left_half, cols);
+    render_subtitle_line(&mut buf, "Utilization", "Temperature", util_col1, util_col2, temp_col);
 
     for i in 0..row_count {
-        let label = format!("#{}", i);
-        render_util_row(&mut buf, &label, lw, &cpu.histories[i], lcw, left_half);
+        // First column: cores 0..half
+        if i < half {
+            let label = format!("#{}", i);
+            render_util_row(&mut buf, &label, lw, &cpu.histories[i], ucw, first_section);
+        } else {
+            render_empty_first_col(&mut buf, first_section);
+        }
 
         let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
 
+        // Second column: cores half..core_count
+        let second_idx = half + i;
+        if second_idx < core_count {
+            let label = format!("#{}", second_idx);
+            render_util_row_inner(&mut buf, &label, lw, &cpu.histories[second_idx], ucw, util_col2);
+        } else {
+            render_empty_col(&mut buf, util_col2);
+        }
+
+        let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+
+        // Third column: temperature
         if i < temp_rows {
             if temp.available() {
                 let labels = temp.labels();
-                render_temp_row(
-                    &mut buf,
-                    labels[i],
-                    tlw,
-                    &temp.histories[i],
-                    rcw,
-                    right_half,
-                );
+                render_temp_row(&mut buf, labels[i], tlw, &temp.histories[i], tcw, third_section);
             } else {
-                render_na_temp_row(&mut buf, tlw, rcw, right_half);
+                render_na_temp_row(&mut buf, tlw, tcw, third_section);
             }
         } else {
-            render_empty_right_half(&mut buf, right_half);
+            render_empty_right_half(&mut buf, third_section);
         }
 
         buf.push_str("\r\n");
     }
 
-    render_separator_line(&mut buf, left_half, cols);
+    render_separator_line(&mut buf, util_col1, util_col2, temp_col);
     render_horizontal_border(&mut buf, '╰', '╯', cols, None);
 
     // --- Memory section ---
+    let total_inner = (cols as usize).saturating_sub(2);
     let aw = mem_abs_width(mem);
     let mcw = mem_chart_width(total_inner, aw);
 

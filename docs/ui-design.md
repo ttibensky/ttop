@@ -6,18 +6,18 @@ ttop renders a full-screen interface using the terminal's alternate screen buffe
 
 ## Screen Layout
 
-The CPU section uses a **side-by-side layout**: utilization sparklines on the left half, temperature sparklines on the right half, separated by a vertical `│` border.
+The CPU section uses a **three-column layout**: the first two thirds display utilization sparklines (CPU threads split into two side-by-side columns), and the last third displays temperature sparklines.
 
 ```
 ╭─ CPU ───────────────────────────────────────────────────────────────────────────────────╮
-│           Utilization               │              Temperature                          │
-│ #0  ▁▁▂▂▃▃▄▃▂▁▁▂▃▄▅▆▅▄▃▂▂▃▄  52% │ Tctl ▁▁▁▁▂▂▂▂▂▂▃▃▃▃▃▃▃▃▃▃▃  46°C (115°F)       │
-│ #1  ▁▁▁▁▁▂▂▂▃▂▂▁▁▁▁▂▂▃▂▁▁▁▁  20% │                                                   │
-│ #2  ▆▇▇█▇▇▆▇████▇▇█████▇▆▇▇  93% │                                                   │
-│ #3  ▃▄▅▅▆▅▅▄▃▃▄▅▆▆▅▅▄▃▃▄▅▅▆  61% │                                                   │
-│ ...                                │                                                   │
-│ #15 ▃▄▅▅▅▅▄▃▃▄▅▅▅▅▅▄▃▃▄▅▅▅▅  65% │                                                   │
-│                                     │                                                   │
+│              Utilization                  │          Temperature                         │
+│ #0  ▁▂▃▄▅▆▅▄▃▂▂▃▄  52% │ #8  ▃▄▅▅▅▄▃▃  48% │ Tctl ▁▁▂▂▂▃▃▃  46°C (115°F)           │
+│ #1  ▁▁▁▁▁▂▂▂▃▂▂▁▁  20% │ #9  ▁▁▁▂▂▁▁▁  15% │                                         │
+│ #2  ▆▇▇█▇▇▆▇████▇  93% │ #10 ▃▄▅▅▆▅▅▄  57% │                                         │
+│ #3  ▃▄▅▅▆▅▅▄▃▃▄▅▆  61% │ #11 ▁▁▂▂▃▃▂▁  30% │                                         │
+│ ...                      │ ...                │                                         │
+│ #7  ▃▄▅▅▅▅▄▃▃▄▅▅▅  65% │ #15 ▂▃▃▄▃▃▂▂  38% │                                         │
+│                          │                    │                                         │
 ╰─────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─ Memory ────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                         │
@@ -34,7 +34,7 @@ The CPU section uses a **side-by-side layout**: utilization sparklines on the le
                                                                         q: quit  ttop v0.1
 ```
 
-**When no temperature sensors are found** (VMs, containers, etc.), the right half shows:
+**When no temperature sensors are found** (VMs, containers, etc.), the temperature column shows:
 
 ```
 │  N/A ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁  N/A°C (N/A°F)  │
@@ -44,11 +44,12 @@ The CPU section uses a **side-by-side layout**: utilization sparklines on the le
 
 The screen is divided into independent boxed sections, stacked vertically:
 
-1. **CPU** — split into two halves:
-   - **Left half:** subtitle "Utilization" (bold cyan, centered), then one utilization sparkline row per logical processor (thread), labeled `#0`–`#N`, with current percentage
-   - **Right half:** subtitle "Temperature" (bold cyan, centered), then one temperature sparkline row per sensor (e.g., `Tctl` for AMD, `Core 0`–`Core N` for Intel), with dual °C/°F display
-   - A vertical `│` separator divides the halves
-   - Temperature rows are **top-aligned**: if there are fewer sensors than CPU cores, remaining right-half rows are blank
+1. **CPU** — split into three columns:
+   - **First two thirds (Utilization):** subtitle "Utilization" (bold cyan, centered across both columns), then CPU threads split in half and displayed side by side — first half in column 1, second half in column 2, each with sparkline chart and current percentage
+   - **Last third (Temperature):** subtitle "Temperature" (bold cyan, centered), then one temperature sparkline row per sensor (e.g., `Tctl` for AMD, `Core 0`–`Core N` for Intel), with dual °C/°F display
+   - Vertical `│` separators divide the three columns
+   - The row count is `max(ceil(cores / 2), temp_sensors)` — roughly half the height of the previous layout
+   - Temperature rows are **top-aligned**: if there are fewer sensors than utilization rows, remaining temperature column rows are blank
    - If no sensors found: a single `N/A°C (N/A°F)` row with dim styling
 2. **Memory** — full-width section with two sparkline rows:
    - **RAM row:** labeled `RAM`, sparkline chart, absolute values (`usedU/totalU`), current percentage
@@ -102,24 +103,25 @@ Empty (no-data) positions render as a dim `▁` character to maintain the visual
 
 ## Row Format
 
-### Utilization Row (left half)
+### Utilization Row (first two columns)
 
 ```
-│ {label} {sparkline_chart} {NNN}% │
+│ {label} {sparkline_chart} {NNN}% │ {label} {sparkline_chart} {NNN}% │
 ```
 
-- **Label:** left-aligned, fixed width — `#0`–`#15` for CPU cores (with trailing space padding), `RAM`/`SWP` for memory, `USE`/`MEM` for GPU
-- **Sparkline:** variable width, fills available left-half space
+- **Label:** left-aligned, fixed width — `#0`–`#N` for CPU cores (with trailing space padding), `RAM`/`SWP` for memory, `USE`/`MEM` for GPU
+- **Sparkline:** variable width, fills available column space
 - **Current value:** right-aligned 3-character percentage
+- CPU threads are split in half: first half in column 1, second half in column 2
 
-### Temperature Row (right half)
+### Temperature Row (third column)
 
 ```
  {label} {sparkline_chart} {NNN}°C ({NNN}°F) │
 ```
 
 - **Label:** right-aligned, fixed width — sensor label (e.g., `Tctl`, `Core 0`)
-- **Sparkline:** variable width, fills available right-half space
+- **Sparkline:** variable width, fills available column space
 - **Current value:** dual Celsius/Fahrenheit display, or `N/A°C (N/A°F)` if unavailable
 
 ### Memory Row (full-width)

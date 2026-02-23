@@ -75,8 +75,8 @@ Thermal data is exposed via the hardware monitoring subsystem:
 
 **AMD vs Intel differences:**
 
-- **AMD (`k10temp`):** exposes a single package temperature sensor labeled `Tctl`. Per-core temperatures are not available. The right half of the CPU section shows one temperature row.
-- **Intel (`coretemp`):** exposes per-core temperature sensors labeled `Core 0`, `Core 1`, etc. The right half shows one row per physical core.
+- **AMD (`k10temp`):** exposes a single package temperature sensor labeled `Tctl`. Per-core temperatures are not available. The temperature column shows one temperature row.
+- **Intel (`coretemp`):** exposes per-core temperature sensors labeled `Core 0`, `Core 1`, etc. The temperature column shows one row per physical core.
 
 Temperature values in sysfs are in millidegrees Celsius (e.g., `46375` = 46.375°C). Displayed in both Celsius and Fahrenheit: `46°C (115°F)`.
 
@@ -198,9 +198,9 @@ The `VecDeque` acts as a ring buffer. When a new sample is pushed and the buffer
 ### Rendering Pipeline
 
 1. **Query terminal size** — get current column and row count
-2. **Calculate layout** — split terminal into left half (utilization) and right half (temperature), determine chart widths for each by subtracting fixed elements (labels, padding, borders, temp display) from half-widths
+2. **Calculate layout** — split terminal into three columns (two utilization columns at 2/3 width, one temperature column at 1/3 width), determine chart widths by subtracting fixed elements (labels, padding, borders, temp display) from column widths
 3. **Resize buffers** — if terminal width changed, grow or shrink history buffers
-4. **Build frame** — iterate over each row; render utilization sparkline on the left, vertical separator, and temperature sparkline on the right; top-align temperature rows (fill remaining right-half rows with empty space)
+4. **Build frame** — split CPU threads in half; iterate over rows, rendering first-half utilization in column 1, second-half in column 2, and temperature in column 3; top-align all three columns
 5. **Output frame** — move cursor to top-left, write the complete frame buffer to stdout in a single flush
 
 The frame is composed in a `String` buffer before writing to minimize flickering. Cursor positioning uses ANSI escape codes (`\x1b[H` to home, `\x1b[K` to clear line remainders).

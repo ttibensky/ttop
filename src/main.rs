@@ -11,8 +11,8 @@ use crossterm::{
 use ttop::cpu::{CpuState, TempState};
 use ttop::memory::MemState;
 use ttop::ui::{
-    label_width, left_chart_width, mem_abs_width, mem_chart_width, render_frame, right_chart_width,
-    temp_label_width,
+    label_width, mem_abs_width, mem_chart_width, render_frame, temp_chart_width, temp_label_width,
+    util_chart_width,
 };
 
 const TICK_INTERVAL: Duration = Duration::from_secs(1);
@@ -49,18 +49,20 @@ fn main() -> io::Result<()> {
 
         let (cols, rows) = terminal::size()?;
 
-        let total_inner = (cols as usize).saturating_sub(2);
-        let left_half = total_inner / 2 + 1;
-        let right_half = (cols as usize).saturating_sub(left_half + 1);
+        let available = (cols as usize).saturating_sub(4);
+        let util_total = (available * 2) / 3;
+        let temp_col = available - util_total;
+        let util_col1 = util_total / 2;
 
         let lw = label_width(cpu.core_count());
-        let lcw = left_chart_width(left_half, lw);
-        cpu.update(lcw);
+        let ucw = util_chart_width(util_col1, lw);
+        cpu.update(ucw);
 
         let tlw = temp_label_width(&temp);
-        let rcw = right_chart_width(right_half, tlw);
-        temp.update(rcw);
+        let tcw = temp_chart_width(temp_col + 1, tlw);
+        temp.update(tcw);
 
+        let total_inner = (cols as usize).saturating_sub(2);
         let aw = mem_abs_width(&mem);
         let mcw = mem_chart_width(total_inner, aw);
         mem.update(mcw);

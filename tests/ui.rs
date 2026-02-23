@@ -2,9 +2,9 @@ use ttop::cpu::temperature::TempState;
 use ttop::cpu::utilization::CpuState;
 use ttop::memory::MemState;
 use ttop::ui::{
-    label_width, left_chart_width, mem_chart_width, render_frame, right_chart_width, sparkline_char,
-    sparkline_char_temp, temperature_color, utilization_color, COLOR_GREEN, COLOR_ORANGE,
-    COLOR_RED, COLOR_YELLOW, SPARKLINE_CHARS,
+    label_width, mem_chart_width, render_frame, sparkline_char, sparkline_char_temp,
+    temp_chart_width, temperature_color, util_chart_width, utilization_color, COLOR_GREEN,
+    COLOR_ORANGE, COLOR_RED, COLOR_YELLOW, SPARKLINE_CHARS,
 };
 
 #[test]
@@ -166,26 +166,26 @@ fn label_width_thousand_one_cores() {
 }
 
 #[test]
-fn left_chart_width_standard() {
-    let cw = left_chart_width(40, 2);
-    assert_eq!(cw, 40 - 2 - 10);
+fn util_chart_width_standard() {
+    let cw = util_chart_width(40, 2);
+    assert_eq!(cw, 40 - 2 - 9);
 }
 
 #[test]
-fn left_chart_width_very_narrow() {
-    let cw = left_chart_width(5, 2);
+fn util_chart_width_very_narrow() {
+    let cw = util_chart_width(5, 2);
     assert_eq!(cw, 8);
 }
 
 #[test]
-fn right_chart_width_standard() {
-    let cw = right_chart_width(40, 4);
+fn temp_chart_width_standard() {
+    let cw = temp_chart_width(40, 4);
     assert_eq!(cw, 40 - 4 - 18);
 }
 
 #[test]
-fn right_chart_width_very_narrow() {
-    let cw = right_chart_width(10, 4);
+fn temp_chart_width_very_narrow() {
+    let cw = temp_chart_width(10, 4);
     assert_eq!(cw, 8);
 }
 
