@@ -1,9 +1,9 @@
 use ttop::cpu::temperature::TempState;
 use ttop::cpu::utilization::CpuState;
 use ttop::gpu::GpuState;
-use ttop::memory::MemState;
+use ttop::memory::{MemState, MemTempState};
 use ttop::ui::{
-    gpu_chart_width, label_width, mem_chart_width, render_frame, sparkline_char,
+    gpu_chart_width, label_width, mem_col_chart_width, render_frame, sparkline_char,
     sparkline_char_temp, temp_chart_width, temperature_color, util_chart_width, utilization_color,
     COLOR_GREEN, COLOR_ORANGE, COLOR_RED, COLOR_YELLOW, SPARKLINE_CHARS,
 };
@@ -195,8 +195,9 @@ fn render_frame_contains_cpu_section() {
     let cpu = CpuState::new();
     let temp = TempState::new();
     let mem = MemState::new();
+    let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &gpu, 120, 40);
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 40);
     let stripped = strip_ansi(&frame);
     assert!(stripped.contains("CPU"), "frame should contain CPU header");
 }
@@ -206,8 +207,9 @@ fn render_frame_contains_subtitles() {
     let cpu = CpuState::new();
     let temp = TempState::new();
     let mem = MemState::new();
+    let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &gpu, 120, 40);
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 40);
     let stripped = strip_ansi(&frame);
     assert!(
         stripped.contains("Utilization"),
@@ -224,8 +226,9 @@ fn render_frame_contains_status_bar() {
     let cpu = CpuState::new();
     let temp = TempState::new();
     let mem = MemState::new();
+    let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &gpu, 120, 40);
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 40);
     let stripped = strip_ansi(&frame);
     assert!(stripped.contains("q: quit"));
     assert!(stripped.contains("ttop v0.1"));
@@ -236,8 +239,9 @@ fn render_frame_contains_all_core_labels() {
     let cpu = CpuState::new();
     let temp = TempState::new();
     let mem = MemState::new();
+    let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &gpu, 120, 60);
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 60);
     let stripped = strip_ansi(&frame);
     for i in 0..cpu.core_count() {
         assert!(
@@ -253,8 +257,9 @@ fn render_frame_has_box_drawing_chars() {
     let cpu = CpuState::new();
     let temp = TempState::new();
     let mem = MemState::new();
+    let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &gpu, 120, 40);
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 40);
     let stripped = strip_ansi(&frame);
     assert!(stripped.contains('╭'));
     assert!(stripped.contains('╮'));
@@ -267,8 +272,9 @@ fn render_frame_contains_vertical_separator() {
     let cpu = CpuState::new();
     let temp = TempState::new();
     let mem = MemState::new();
+    let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &gpu, 120, 40);
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 40);
     let stripped = strip_ansi(&frame);
     let lines: Vec<&str> = stripped.lines().collect();
     if lines.len() > 2 {
@@ -286,8 +292,9 @@ fn render_frame_shows_temp_or_na() {
     let cpu = CpuState::new();
     let temp = TempState::new();
     let mem = MemState::new();
+    let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &gpu, 120, 40);
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 40);
     let stripped = strip_ansi(&frame);
     let has_temp = stripped.contains("°C") && stripped.contains("°F");
     let has_na = stripped.contains("N/A");
@@ -299,8 +306,9 @@ fn render_frame_contains_memory_section() {
     let cpu = CpuState::new();
     let temp = TempState::new();
     let mem = MemState::new();
+    let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &gpu, 120, 60);
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 60);
     let stripped = strip_ansi(&frame);
     assert!(stripped.contains("Memory"), "frame should contain Memory header");
 }
@@ -310,37 +318,55 @@ fn render_frame_contains_ram_and_swp_labels() {
     let cpu = CpuState::new();
     let temp = TempState::new();
     let mem = MemState::new();
+    let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &gpu, 120, 60);
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 60);
     let stripped = strip_ansi(&frame);
     assert!(stripped.contains("RAM"), "frame should contain RAM label");
     assert!(stripped.contains("SWP"), "frame should contain SWP label");
 }
 
 #[test]
-fn mem_chart_width_standard() {
-    let cw = mem_chart_width(100, 9);
-    assert_eq!(cw, 100 - 13 - 9);
+fn mem_col_chart_width_standard() {
+    let cw = mem_col_chart_width(40, 9);
+    assert_eq!(cw, 40 - 12 - 9);
 }
 
 #[test]
-fn mem_chart_width_very_narrow() {
-    let cw = mem_chart_width(10, 9);
+fn mem_col_chart_width_very_narrow() {
+    let cw = mem_col_chart_width(10, 9);
     assert_eq!(cw, 8);
 }
 
 #[test]
-fn mem_chart_width_short_abs() {
-    // "5.1GB/8.0GB" = 12 chars
-    let cw = mem_chart_width(100, 12);
-    assert_eq!(cw, 100 - 13 - 12);
+fn mem_col_chart_width_short_abs() {
+    let cw = mem_col_chart_width(40, 12);
+    assert_eq!(cw, 40 - 12 - 12);
 }
 
 #[test]
-fn mem_chart_width_long_abs() {
-    // "999.8GB/999.9GB" = 15 chars
-    let cw = mem_chart_width(100, 15);
-    assert_eq!(cw, 100 - 13 - 15);
+fn mem_col_chart_width_long_abs() {
+    let cw = mem_col_chart_width(40, 15);
+    assert_eq!(cw, 40 - 12 - 15);
+}
+
+#[test]
+fn render_frame_memory_has_three_column_subtitles() {
+    let cpu = CpuState::new();
+    let temp = TempState::new();
+    let mem = MemState::new();
+    let mem_temp = MemTempState::new();
+    let gpu = GpuState::new();
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 60);
+    let stripped = strip_ansi(&frame);
+    assert!(
+        stripped.contains("RAM Utilization"),
+        "frame should contain 'RAM Utilization' subtitle"
+    );
+    assert!(
+        stripped.contains("Swap Utilization"),
+        "frame should contain 'Swap Utilization' subtitle"
+    );
 }
 
 #[test]

@@ -49,6 +49,22 @@ Full-width "Memory" section box below the CPU section, with sparkline rows for R
 8. **Color reuse** — memory sparklines use existing `utilization_color()` and `sparkline_char()`
 9. **Swap-disabled handling** — when `SwapTotal == 0`, SWP row renders in dim gray with `0.0GB/0.0GB   0%`
 
+## Phase 3.5: Memory Temperature + Three-Column Layout ✓
+
+Redesigned Memory section from full-width to three-column layout (equal thirds): RAM Utilization, Swap Utilization, and DIMM Temperature.
+
+### Deliverables
+
+1. **New `src/memory/temperature.rs`** — `MemTempState` with jc42 hwmon discovery, per-DIMM temperature reading, rolling history
+2. **jc42 hwmon discovery** — scan `/sys/class/hwmon/` for `name == "jc42"`, enumerate one sensor per DIMM
+3. **DIMM labels** — use `temp1_label` if present, otherwise `DIMM0`, `DIMM1`, etc.
+4. **Three-column layout** — equal thirds with `│` separators: RAM Utilization | Swap Utilization | Temperature
+5. **Subtitle line** — three centered subtitles: "RAM Utilization", "Swap Utilization", "Temperature" (bold cyan)
+6. **Temperature sparklines** — same rendering as CPU temperature (30–100°C range, `temperature_color()`, dual °C/°F display)
+7. **Row count** — `max(1, dimm_sensor_count)`; RAM and SWAP always in row 0, extra rows for additional DIMMs
+8. **Graceful degradation** — when no jc42 sensors found, temperature column shows `N/A°C (N/A°F)` with dim styling
+9. **Color reuse** — RAM/SWAP use `utilization_color()`, temperature uses `temperature_color()` and `sparkline_char_temp()`
+
 ## Phase 4: GPU ✓
 
 Full-width "GPU" section box below Memory, with utilization, memory, and temperature sparklines. GPU name displayed in the section title. Section hidden entirely when no GPU is detected.
@@ -133,7 +149,7 @@ Run a resource-usage comparison of `ttop` vs `top` vs `htop` and publish the res
 |----------|--------|-----------|
 | Language | Rust | Performance, safety, single binary distribution |
 | Terminal library | `crossterm` | Minimal, cross-platform terminal control without a full TUI framework |
-| Data source | `/proc/stat`, `/sys/class/hwmon/`, `/proc/meminfo`, `nvidia-smi`, `/sys/class/drm/`, `/proc/mounts`, `statvfs`, `/proc/diskstats` | Kernel interfaces + vendor CLI where sysfs is unavailable |
+| Data source | `/proc/stat`, `/sys/class/hwmon/` (coretemp/k10temp, jc42, amdgpu), `/proc/meminfo`, `nvidia-smi`, `/sys/class/drm/`, `/proc/mounts`, `statvfs`, `/proc/diskstats` | Kernel interfaces + vendor CLI where sysfs is unavailable |
 | Chart type | Single-row sparklines (`▁▂▃▄▅▆▇█`) | Compact enough to show all cores on one screen, 8 levels of vertical resolution per row |
 | Chart width | Dynamic (fills terminal width) | Wider terminals show more history; adapts on resize |
 | Color scheme | Green → Yellow → Orange → Red | Intuitive severity gradient, readable on dark backgrounds |

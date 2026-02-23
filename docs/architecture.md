@@ -100,7 +100,29 @@ The parser reads the file each tick and extracts four fields by key name. Values
 - RAM usage: `(MemTotal - MemAvailable) / MemTotal * 100`
 - Swap usage: `(SwapTotal - SwapFree) / SwapTotal * 100`
 
-**Swap-disabled handling:** when `SwapTotal == 0`, the swap percentage is 0 and the SWP row renders in dim gray with `0.0GB/0.0GB   0%`.
+**Swap-disabled handling:** when `SwapTotal == 0`, the swap percentage is 0 and the SWP column renders in dim gray with `0.0GB/0.0GB   0%`.
+
+### Memory Temperature — `/sys/class/hwmon/` (jc42)
+
+DIMM temperature sensors are exposed via the JEDEC JC42.4 standard driver:
+
+```
+/sys/class/hwmon/hwmonN/temp1_input   # temperature in millidegrees Celsius
+/sys/class/hwmon/hwmonN/temp1_label   # sensor label (optional)
+/sys/class/hwmon/hwmonN/name          # driver name: "jc42"
+```
+
+**Discovery algorithm:**
+
+1. Iterate over `/sys/class/hwmon/hwmon*/`
+2. Read the `name` file in each directory
+3. Match on `jc42`
+4. For each matched device, read `temp1_input` (one sensor per DIMM)
+5. Use `temp1_label` as the display label if present; otherwise use `DIMM0`, `DIMM1`, etc.
+
+Temperature values are in millidegrees Celsius, converted and displayed the same as CPU temperatures: `42°C (108°F)`.
+
+**Graceful degradation:** when no `jc42` hwmon device is found (no DIMM sensors, VMs, containers), the temperature column displays `N/A°C (N/A°F)` with dim styling.
 
 ### GPU — vendor-specific
 
@@ -139,7 +161,8 @@ src/
 │   ├── nvidia.rs         # NVIDIA detection and reading via nvidia-smi
 │   └── amd.rs            # AMD detection and reading via DRM/hwmon sysfs
 ├── memory/
-│   ├── mod.rs            # re-exports MemState, MemInfo
+│   ├── mod.rs            # re-exports MemState, MemInfo, MemTempState
+│   ├── temperature.rs    # jc42 hwmon discovery, DIMM temp reading, history
 │   └── usage.rs          # /proc/meminfo parsing, RAM+swap usage history
 └── ui.rs                 # rendering: layout, sparklines, colors, frame composition
 
@@ -147,6 +170,7 @@ tests/
 ├── cpu_temperature.rs    # temperature module tests
 ├── cpu_utilization.rs    # CPU utilization module tests
 ├── gpu.rs                # GPU module tests
+├── memory_temperature.rs # DIMM temperature module tests
 ├── memory_usage.rs       # memory usage module tests
 └── ui.rs                 # UI rendering tests
 ```
@@ -158,8 +182,9 @@ All tests are external integration tests that import from the `ttop` library cra
 ```
 initialize terminal (alternate screen, raw mode, hide cursor)
 take initial /proc/stat snapshot
-discover temperature sensors via hwmon
+discover CPU temperature sensors via hwmon (k10temp/coretemp)
 take initial /proc/meminfo snapshot
+discover DIMM temperature sensors via hwmon (jc42)
 detect GPU vendor (NVIDIA via nvidia-smi, AMD via /sys/class/drm/)
 
 loop every 1 second:
@@ -167,8 +192,9 @@ loop every 1 second:
         if 'q' or Ctrl+C → break
 
     read /proc/stat → compute per-core utilization deltas
-    read hwmon tempN_input → current temperatures
+    read hwmon tempN_input → current CPU temperatures
     read /proc/meminfo → compute RAM and swap usage percentages
+    read hwmon jc42 tempN_input → current DIMM temperatures
     read GPU metrics (nvidia-smi or sysfs) → utilization, memory, temperature
     push new values into history buffers
 
@@ -214,6 +240,16 @@ struct MemState {
     current: MemInfo,                  // latest raw values for absolute display
 }
 
+struct MemTempSensor {
+    input_path: PathBuf,               // e.g. /sys/class/hwmon/hwmon5/temp1_input
+    label: String,                     // e.g. "DIMM0", "DIMM1"
+}
+
+struct MemTempState {
+    sensors: Vec<MemTempSensor>,
+    histories: Vec<VecDeque<f64>>,     // one per DIMM, values in °C
+}
+
 enum GpuBackend {
     Nvidia,
     Amd { card_path: PathBuf, hwmon_path: Option<PathBuf> },
@@ -236,9 +272,9 @@ The `VecDeque` acts as a ring buffer. When a new sample is pushed and the buffer
 ### Rendering Pipeline
 
 1. **Query terminal size** — get current column and row count
-2. **Calculate layout** — split terminal into three columns (two utilization columns at 2/3 width, one temperature column at 1/3 width), determine chart widths by subtracting fixed elements (labels, padding, borders, temp display) from column widths
+2. **Calculate layout** — CPU: split into three columns (two utilization columns at 2/3 width, one temperature column at 1/3 width); Memory: split into three equal columns (RAM utilization, swap utilization, DIMM temperature); determine chart widths by subtracting fixed elements (labels, padding, borders, temp display) from column widths
 3. **Resize buffers** — if terminal width changed, grow or shrink history buffers
-4. **Build frame** — split CPU threads in half; iterate over rows, rendering first-half utilization in column 1, second-half in column 2, and temperature in column 3; top-align all three columns
+4. **Build frame** — CPU: split threads in half, render utilization in columns 1–2 and temperature in column 3; Memory: render RAM in column 1, swap in column 2, DIMM temperature in column 3; top-align all columns
 5. **Output frame** — move cursor to top-left, write the complete frame buffer to stdout in a single flush
 
 The frame is composed in a `String` buffer before writing to minimize flickering. Cursor positioning uses ANSI escape codes (`\x1b[H` to home, `\x1b[K` to clear line remainders).

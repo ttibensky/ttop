@@ -4,6 +4,7 @@ use std::fmt::Write;
 use crate::cpu::temperature::{self, TempState};
 use crate::cpu::utilization::CpuState;
 use crate::gpu::GpuState;
+use crate::memory::temperature::MemTempState;
 use crate::memory::{format_mem_pair, MemState};
 
 pub const SPARKLINE_CHARS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
@@ -103,17 +104,30 @@ pub fn mem_abs_width(mem: &MemState) -> usize {
     ram_text.len().max(swap_text.len())
 }
 
-/// Compute the chart width for a full-width memory row.
-/// `inner_cols` is the space between the two `│` border characters (cols − 2).
-/// Inner layout: " " + label(3) + " " + chart + " " + abs + "  " + "NNN%" + " "
-///                1   + 3        + 1   + cw    + 1   + aw  + 2    + 4      + 1  = 13 + aw + cw
-pub fn mem_chart_width(inner_cols: usize, abs_w: usize) -> usize {
-    let fixed = 13 + abs_w;
-    if inner_cols > fixed {
-        inner_cols - fixed
+/// Compute the chart width for a memory column (RAM or SWAP) in the three-column layout.
+/// `col_inner` is the inner width of the column (without borders).
+/// Layout: " " + label(3) + " " + chart + " " + abs + "  " + "NNN%"
+///          1   + 3        + 1   + cw    + 1   + aw  + 2    + 4     = 12 + aw + cw
+pub fn mem_col_chart_width(col_inner: usize, abs_w: usize) -> usize {
+    let fixed = 12 + abs_w;
+    if col_inner > fixed {
+        col_inner - fixed
     } else {
         8
     }
+}
+
+pub fn mem_temp_label_width(mem_temp: &MemTempState) -> usize {
+    if !mem_temp.available() {
+        return 3;
+    }
+    mem_temp
+        .labels()
+        .iter()
+        .map(|l| l.len())
+        .max()
+        .unwrap_or(4)
+        .max(3)
 }
 
 /// Compute the width of the absolute value text for GPU memory.
@@ -397,13 +411,13 @@ fn render_na_temp_row(buf: &mut String, tlw: usize, cw: usize, half_width: usize
     let _ = write!(buf, " {COLOR_DIM_GRAY}│{COLOR_RESET}");
 }
 
-fn render_mem_row(
+fn render_mem_col_first(
     buf: &mut String,
     label: &str,
     history: &VecDeque<f64>,
     cw: usize,
     abs_formatted: &str,
-    inner: usize,
+    section_width: usize,
     dim: bool,
 ) {
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET} ");
@@ -440,11 +454,87 @@ fn render_mem_row(
     }
 
     let used = 2 + 3 + 1 + cw + 1 + abs_w + 2 + 4;
-    let pad = inner.saturating_sub(used);
+    let pad = section_width.saturating_sub(used);
     for _ in 0..pad {
         buf.push(' ');
     }
-    let _ = write!(buf, " {COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
+}
+
+fn render_mem_col_inner(
+    buf: &mut String,
+    label: &str,
+    history: &VecDeque<f64>,
+    cw: usize,
+    abs_formatted: &str,
+    col_width: usize,
+    dim: bool,
+) {
+    let _ = write!(buf, " ");
+    let _ = write!(buf, "{COLOR_WHITE}{:<3}{COLOR_RESET} ", label);
+
+    let data_len = history.len();
+    let empty_slots = cw.saturating_sub(data_len);
+
+    if dim {
+        for _ in 0..cw {
+            let _ = write!(buf, "{COLOR_DIM_CHART}▁{COLOR_RESET}");
+        }
+    } else {
+        for _ in 0..empty_slots {
+            let _ = write!(buf, "{COLOR_DIM_CHART}▁{COLOR_RESET}");
+        }
+        for &val in history.iter().skip(data_len.saturating_sub(cw)) {
+            let ch = sparkline_char(val);
+            let color = utilization_color(val);
+            let _ = write!(buf, "{color}{ch}{COLOR_RESET}");
+        }
+    }
+
+    let current_pct = history.back().copied().unwrap_or(0.0);
+    let abs_w = abs_formatted.len();
+
+    if dim {
+        let _ = write!(buf, " {COLOR_DIM_GRAY}{abs_formatted}{COLOR_RESET}");
+        let _ = write!(buf, "  {COLOR_DIM_GRAY}{:>3.0}%{COLOR_RESET}", current_pct);
+    } else {
+        let color = utilization_color(current_pct);
+        let _ = write!(buf, " {color}{abs_formatted}{COLOR_RESET}");
+        let _ = write!(buf, "  {color}{:>3.0}%{COLOR_RESET}", current_pct);
+    }
+
+    let used = 1 + 3 + 1 + cw + 1 + abs_w + 2 + 4;
+    let pad = col_width.saturating_sub(used);
+    for _ in 0..pad {
+        buf.push(' ');
+    }
+}
+
+fn render_mem_subtitle_line(
+    buf: &mut String,
+    col1: usize,
+    col2: usize,
+    col3: usize,
+) {
+    let titles = [
+        ("RAM Utilization", col1),
+        ("Swap Utilization", col2),
+        ("Temperature", col3),
+    ];
+
+    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+    for (title, col_width) in titles {
+        let pad_left = col_width.saturating_sub(title.len()) / 2;
+        let pad_right = col_width.saturating_sub(pad_left + title.len());
+        for _ in 0..pad_left {
+            buf.push(' ');
+        }
+        let _ = write!(buf, "{COLOR_BOLD_CYAN}{title}{COLOR_RESET}");
+        for _ in 0..pad_right {
+            buf.push(' ');
+        }
+        let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+    }
+    buf.push_str("\r\n");
 }
 
 fn render_mem_separator(buf: &mut String, cols: u16) {
@@ -537,7 +627,7 @@ fn render_separator_line(
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
 }
 
-pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, gpu: &GpuState, cols: u16, rows: u16) -> String {
+pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, mem_temp: &MemTempState, gpu: &GpuState, cols: u16, rows: u16) -> String {
     // 3-column layout: │ util_col1 │ util_col2 │ temp_col │
     let available = (cols as usize).saturating_sub(4);
     let util_total = (available * 2) / 3;
@@ -609,31 +699,103 @@ pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, gpu: &GpuS
     render_separator_line(&mut buf, util_col1, util_col2, temp_col);
     render_horizontal_border(&mut buf, '╰', '╯', cols, None);
 
-    // --- Memory section ---
-    let total_inner = (cols as usize).saturating_sub(2);
+    // --- Memory section (three-column layout) ---
+    let mem_avail = (cols as usize).saturating_sub(4);
+    let mem_col1 = mem_avail / 3;
+    let mem_col2 = mem_avail / 3;
+    let mem_col3 = mem_avail - mem_col1 - mem_col2;
+
+    let mem_first_section = mem_col1 + 1;
+    let mem_third_section = mem_col3 + 1;
+
     let aw = mem_abs_width(mem);
-    let mcw = mem_chart_width(total_inner, aw);
+    let mcw = mem_col_chart_width(mem_col1, aw);
+
+    let mtlw = mem_temp_label_width(mem_temp);
+    let mtcw = temp_chart_width(mem_third_section, mtlw);
 
     let ram_used_kb = mem.current.mem_total_kb.saturating_sub(mem.current.mem_available_kb);
-    let ram_abs = format!("{:>width$}", format_mem_pair(ram_used_kb, mem.current.mem_total_kb), width = aw);
+    let ram_abs = format!(
+        "{:>width$}",
+        format_mem_pair(ram_used_kb, mem.current.mem_total_kb),
+        width = aw
+    );
 
     let swap_used_kb = mem.current.swap_total_kb.saturating_sub(mem.current.swap_free_kb);
-    let swap_abs = format!("{:>width$}", format_mem_pair(swap_used_kb, mem.current.swap_total_kb), width = aw);
+    let swap_abs = format!(
+        "{:>width$}",
+        format_mem_pair(swap_used_kb, mem.current.swap_total_kb),
+        width = aw
+    );
+
+    let mem_temp_rows = if mem_temp.available() {
+        mem_temp.sensor_count()
+    } else {
+        1
+    };
+    let mem_row_count = mem_temp_rows.max(1);
 
     render_horizontal_border(&mut buf, '╭', '╮', cols, Some("Memory"));
-    render_mem_separator(&mut buf, cols);
-    render_mem_row(&mut buf, "RAM", &mem.ram_history, mcw, &ram_abs, total_inner, false);
-    render_mem_row(
-        &mut buf,
-        "SWP",
-        &mem.swap_history,
-        mcw,
-        &swap_abs,
-        total_inner,
-        !mem.swap_available(),
-    );
-    render_mem_separator(&mut buf, cols);
+    render_mem_subtitle_line(&mut buf, mem_col1, mem_col2, mem_col3);
+
+    for i in 0..mem_row_count {
+        if i == 0 {
+            render_mem_col_first(
+                &mut buf,
+                "RAM",
+                &mem.ram_history,
+                mcw,
+                &ram_abs,
+                mem_first_section,
+                false,
+            );
+        } else {
+            render_empty_first_col(&mut buf, mem_first_section);
+        }
+
+        let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+
+        if i == 0 {
+            render_mem_col_inner(
+                &mut buf,
+                "SWP",
+                &mem.swap_history,
+                mcw,
+                &swap_abs,
+                mem_col2,
+                !mem.swap_available(),
+            );
+        } else {
+            render_empty_col(&mut buf, mem_col2);
+        }
+
+        let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+
+        if i < mem_temp_rows {
+            if mem_temp.available() {
+                let labels = mem_temp.labels();
+                render_temp_row(
+                    &mut buf,
+                    labels[i],
+                    mtlw,
+                    &mem_temp.histories[i],
+                    mtcw,
+                    mem_third_section,
+                );
+            } else {
+                render_na_temp_row(&mut buf, mtlw, mtcw, mem_third_section);
+            }
+        } else {
+            render_empty_right_half(&mut buf, mem_third_section);
+        }
+
+        buf.push_str("\r\n");
+    }
+
+    render_separator_line(&mut buf, mem_col1, mem_col2, mem_col3);
     render_horizontal_border(&mut buf, '╰', '╯', cols, None);
+
+    let total_inner = (cols as usize).saturating_sub(2);
 
     // --- GPU section (only when a GPU is detected) ---
     let gpu_lines = if gpu.available() {
@@ -669,8 +831,9 @@ pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, gpu: &GpuS
 
     // fill remaining rows
     // CPU: 4 border/subtitle/separator lines + row_count data rows
-    // Memory: 4 border/separator lines + 2 data rows
-    let used_lines = (row_count + 4) + 6 + gpu_lines;
+    // Memory: 4 border/subtitle/separator lines + mem_row_count data rows
+    let mem_lines = mem_row_count + 4;
+    let used_lines = (row_count + 4) + mem_lines + gpu_lines;
     let remaining_lines = (rows as usize).saturating_sub(used_lines + 1);
     for _ in 0..remaining_lines {
         let _ = write!(buf, "\x1b[K\r\n");

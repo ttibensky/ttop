@@ -10,10 +10,10 @@ use crossterm::{
 
 use ttop::cpu::{CpuState, TempState};
 use ttop::gpu::GpuState;
-use ttop::memory::MemState;
+use ttop::memory::{MemState, MemTempState};
 use ttop::ui::{
-    gpu_abs_width, gpu_chart_width, label_width, mem_abs_width, mem_chart_width, render_frame,
-    temp_chart_width, temp_label_width, util_chart_width,
+    gpu_abs_width, gpu_chart_width, label_width, mem_abs_width, mem_col_chart_width,
+    mem_temp_label_width, render_frame, temp_chart_width, temp_label_width, util_chart_width,
 };
 
 const TICK_INTERVAL: Duration = Duration::from_secs(1);
@@ -44,6 +44,7 @@ fn main() -> io::Result<()> {
     let mut cpu = CpuState::new();
     let mut temp = TempState::new();
     let mut mem = MemState::new();
+    let mut mem_temp = MemTempState::new();
     let mut gpu = GpuState::new();
 
     loop {
@@ -64,16 +65,25 @@ fn main() -> io::Result<()> {
         let tcw = temp_chart_width(temp_col + 1, tlw);
         temp.update(tcw);
 
-        let total_inner = (cols as usize).saturating_sub(2);
+        let mem_avail = (cols as usize).saturating_sub(4);
+        let mem_col1 = mem_avail / 3;
+        let mem_col3 = mem_avail - mem_col1 - mem_avail / 3;
+
         let aw = mem_abs_width(&mem);
-        let mcw = mem_chart_width(total_inner, aw);
+        let mcw = mem_col_chart_width(mem_col1, aw);
         mem.update(mcw);
 
+        let mem_third_section = mem_col3 + 1;
+        let mtlw = mem_temp_label_width(&mem_temp);
+        let mtcw = temp_chart_width(mem_third_section, mtlw);
+        mem_temp.update(mtcw);
+
+        let total_inner = (cols as usize).saturating_sub(2);
         let gaw = gpu_abs_width(&gpu);
         let gcw = gpu_chart_width(total_inner, gaw);
         gpu.update(gcw);
 
-        let frame = render_frame(&cpu, &temp, &mem, &gpu, cols, rows);
+        let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, cols, rows);
         stdout.write_all(frame.as_bytes())?;
         stdout.flush()?;
 
