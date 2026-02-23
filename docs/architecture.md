@@ -102,10 +102,25 @@ The parser reads the file each tick and extracts four fields by key name. Values
 
 **Swap-disabled handling:** when `SwapTotal == 0`, the swap percentage is 0 and the SWP row renders in dim gray with `0.0GB/0.0GB   0%`.
 
-### GPU — vendor-specific (future)
+### GPU — vendor-specific
 
-- **NVIDIA:** read from `nvidia-smi --query-gpu=utilization.gpu,utilization.memory,temperature.gpu --format=csv,noheader,nounits` or the NVML sysfs interface
-- **AMD:** read from `/sys/class/drm/card0/device/gpu_busy_percent` and related sysfs files
+GPU data comes from vendor-specific interfaces:
+
+**NVIDIA** — reads from `nvidia-smi` (the standard NVIDIA management CLI):
+
+- Detection: `nvidia-smi --query-gpu=name --format=csv,noheader,nounits`
+- Per-tick read: `nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu --format=csv,noheader,nounits`
+- Returns: utilization %, memory used/total in MiB, temperature in °C
+
+**AMD** — reads from kernel sysfs interfaces:
+
+- Detection: scan `/sys/class/drm/card*/device/vendor` for AMD vendor ID `0x1002`
+- Utilization: `/sys/class/drm/cardN/device/gpu_busy_percent` (0–100)
+- Memory: `/sys/class/drm/cardN/device/mem_info_vram_used` and `mem_info_vram_total` (bytes)
+- Temperature: hwmon device with `name == "amdgpu"`, reading `temp1_input` (millidegrees)
+- GPU name: `/sys/class/drm/cardN/device/product_name`
+
+**Graceful degradation:** when no GPU is detected (no NVIDIA driver, no AMD card), the GPU section is not rendered at all.
 
 ## Application Structure
 
@@ -113,12 +128,16 @@ The parser reads the file each tick and extracts four fields by key name. Values
 
 ```
 src/
-├── lib.rs                # library crate root, re-exports cpu, memory, and ui modules
+├── lib.rs                # library crate root, re-exports cpu, gpu, memory, and ui modules
 ├── main.rs               # binary entry point, terminal init, event loop
 ├── cpu/
 │   ├── mod.rs            # re-exports CpuState, CpuTimes, TempState
 │   ├── utilization.rs    # /proc/stat parsing, per-core usage history
 │   └── temperature.rs    # hwmon discovery, sysfs temp reading, history
+├── gpu/
+│   ├── mod.rs            # GpuState, GpuBackend enum, vendor detection dispatch
+│   ├── nvidia.rs         # NVIDIA detection and reading via nvidia-smi
+│   └── amd.rs            # AMD detection and reading via DRM/hwmon sysfs
 ├── memory/
 │   ├── mod.rs            # re-exports MemState, MemInfo
 │   └── usage.rs          # /proc/meminfo parsing, RAM+swap usage history
@@ -127,6 +146,7 @@ src/
 tests/
 ├── cpu_temperature.rs    # temperature module tests
 ├── cpu_utilization.rs    # CPU utilization module tests
+├── gpu.rs                # GPU module tests
 ├── memory_usage.rs       # memory usage module tests
 └── ui.rs                 # UI rendering tests
 ```
@@ -140,6 +160,7 @@ initialize terminal (alternate screen, raw mode, hide cursor)
 take initial /proc/stat snapshot
 discover temperature sensors via hwmon
 take initial /proc/meminfo snapshot
+detect GPU vendor (NVIDIA via nvidia-smi, AMD via /sys/class/drm/)
 
 loop every 1 second:
     poll for key events (non-blocking)
@@ -148,6 +169,7 @@ loop every 1 second:
     read /proc/stat → compute per-core utilization deltas
     read hwmon tempN_input → current temperatures
     read /proc/meminfo → compute RAM and swap usage percentages
+    read GPU metrics (nvidia-smi or sysfs) → utilization, memory, temperature
     push new values into history buffers
 
     calculate layout dimensions (left/right halves from terminal size)
@@ -190,6 +212,22 @@ struct MemState {
     ram_history: VecDeque<f64>,        // RAM usage percentage
     swap_history: VecDeque<f64>,       // swap usage percentage
     current: MemInfo,                  // latest raw values for absolute display
+}
+
+enum GpuBackend {
+    Nvidia,
+    Amd { card_path: PathBuf, hwmon_path: Option<PathBuf> },
+    None,
+}
+
+struct GpuState {
+    backend: GpuBackend,               // vendor-specific reader
+    name: String,                      // GPU product name (shown in section title)
+    util_history: VecDeque<f64>,       // GPU utilization percentage
+    mem_history: VecDeque<f64>,        // GPU memory usage percentage
+    temp_history: VecDeque<f64>,       // GPU temperature in °C
+    current_mem_used_kb: u64,          // for absolute memory display
+    current_mem_total_kb: u64,
 }
 ```
 

@@ -49,13 +49,21 @@ Full-width "Memory" section box below the CPU section, with sparkline rows for R
 8. **Color reuse** — memory sparklines use existing `utilization_color()` and `sparkline_char()`
 9. **Swap-disabled handling** — when `SwapTotal == 0`, SWP row renders in dim gray with `0.0GB/0.0GB   0%`
 
-## Phase 4: GPU
+## Phase 4: GPU ✓
 
-- Detect GPU vendor (NVIDIA / AMD / Intel)
-- NVIDIA: query `nvidia-smi` or NVML sysfs interface
-- AMD: read from `/sys/class/drm/` sysfs files
-- Add the GPU section box with utilization, memory, and temperature sparklines
-- GPU name displayed in the section title
+Full-width "GPU" section box below Memory, with utilization, memory, and temperature sparklines. GPU name displayed in the section title. Section hidden entirely when no GPU is detected.
+
+### Deliverables
+
+1. **Vendor detection** — try NVIDIA first (via `nvidia-smi`), then AMD (via `/sys/class/drm/` vendor ID `0x1002`)
+2. **New `src/gpu/` module** — `GpuState` (rolling `VecDeque<f64>` history for util/mem/temp), `GpuBackend` enum dispatching to vendor-specific readers
+3. **NVIDIA backend (`src/gpu/nvidia.rs`)** — `detect()` queries `nvidia-smi --query-gpu=name`; `read_snapshot()` queries utilization, memory used/total, and temperature in a single call
+4. **AMD backend (`src/gpu/amd.rs`)** — `detect()` scans `/sys/class/drm/card*/device/vendor` for `0x1002`; reads `gpu_busy_percent`, `mem_info_vram_used/total` from sysfs; temperature via hwmon `amdgpu` driver
+5. **GPU name in title** — section header renders as `╭─ GPU: <name> ─╮`
+6. **Three sparkline rows** — `USE` (utilization %), `MEM` (memory % + absolute values), `TMP` (temperature °C/°F)
+7. **Chart width calculation** — `gpu_chart_width()` accounts for widest row (MEM with absolute values or TMP with °C/°F display)
+8. **Color reuse** — USE and MEM rows use `utilization_color()`; TMP row uses `temperature_color()` and `sparkline_char_temp()`
+9. **Graceful degradation** — section not rendered when no GPU detected; temperature row shows N/A if no hwmon found
 
 ## Phase 5: Disk (Space + I/O)
 
@@ -112,7 +120,7 @@ Publish ttop as a PPA so users can install it with `sudo apt install ttop`.
 |----------|--------|-----------|
 | Language | Rust | Performance, safety, single binary distribution |
 | Terminal library | `crossterm` | Minimal, cross-platform terminal control without a full TUI framework |
-| Data source | `/proc/stat`, `/sys/class/hwmon/`, `/proc/meminfo`, `/proc/mounts`, `statvfs`, `/proc/diskstats` | Direct kernel interfaces, zero runtime dependencies |
+| Data source | `/proc/stat`, `/sys/class/hwmon/`, `/proc/meminfo`, `nvidia-smi`, `/sys/class/drm/`, `/proc/mounts`, `statvfs`, `/proc/diskstats` | Kernel interfaces + vendor CLI where sysfs is unavailable |
 | Chart type | Single-row sparklines (`▁▂▃▄▅▆▇█`) | Compact enough to show all cores on one screen, 8 levels of vertical resolution per row |
 | Chart width | Dynamic (fills terminal width) | Wider terminals show more history; adapts on resize |
 | Color scheme | Green → Yellow → Orange → Red | Intuitive severity gradient, readable on dark backgrounds |

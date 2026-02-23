@@ -56,7 +56,12 @@ The screen is divided into independent boxed sections, stacked vertically:
    - **SWP row:** labeled `SWP`, sparkline chart, absolute values, current percentage
    - Uses `utilization_color()` color thresholds (same as CPU utilization)
    - When swap is disabled (`SwapTotal == 0`): SWP row renders entirely in dim gray with `0.0GB/0.0GB   0%`
-3. **GPU** (future) — one row for utilization, one for memory (GPU name in section title)
+3. **GPU** — full-width section with three sparkline rows (only rendered when a GPU is detected):
+   - **USE row:** GPU utilization percentage, uses `utilization_color()` thresholds
+   - **MEM row:** GPU memory usage percentage + absolute values (`usedU/totalU`), uses `utilization_color()`
+   - **TMP row:** GPU temperature sparkline with dual °C/°F display, uses `temperature_color()` and `sparkline_char_temp()`
+   - GPU product name displayed in section title: `╭─ GPU: <name> ─╮`
+   - When no GPU is detected, the entire section is omitted
 
 Each section is enclosed in a box using Unicode box-drawing characters (`╭╮╰╯│─`) and has a labeled header. Sections are visually separated by the gap between boxes.
 
