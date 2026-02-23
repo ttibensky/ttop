@@ -88,6 +88,10 @@ cargo test
 
 To add unit tests, add `#[test]` functions to the existing `mod tests` block in the relevant source file. To add integration tests, create a new `.rs` file under `tests/` — each file is compiled as a separate test binary.
 
+#### Commit Messages
+
+This project follows the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification. A Cursor skill at [`.cursor/skills/conventional-commit/SKILL.md`](.cursor/skills/conventional-commit/SKILL.md) can generate compliant commit messages from your staged changes.
+
 #### Before Committing
 
 Always run the following before pushing changes:
