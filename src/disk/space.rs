@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::ffi::CString;
 use std::fs;
 
-use crate::memory::usage::format_mem_pair;
+use crate::memory::usage::{format_mem_pair, max_mem_pair_width};
 
 const VIRTUAL_FS_TYPES: &[&str] = &[
     "autofs",
@@ -169,8 +169,9 @@ impl DiskSpaceState {
     }
 
     pub fn abs_width(&self) -> usize {
-        (0..self.mounts.len())
-            .map(|i| self.abs_text(i).len())
+        self.current_total_kb
+            .iter()
+            .map(|&total| max_mem_pair_width(total))
             .max()
             .unwrap_or(0)
     }

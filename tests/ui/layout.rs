@@ -1,5 +1,7 @@
+use ttop::memory::usage::{format_mem_pair, max_mem_pair_width};
 use ttop::ui::{
-    core_columns, label_width, mem_col_chart_width, temp_chart_width, util_chart_width,
+    core_columns, gpu_abs_width, label_width, mem_abs_width, mem_col_chart_width, temp_chart_width,
+    util_chart_width,
 };
 
 #[test]
@@ -89,6 +91,66 @@ fn mem_col_chart_width_long_abs() {
     let cw = mem_col_chart_width(40, 15);
     assert_eq!(cw, 40 - 12 - 15);
 }
+
+// --- mem_abs_width / gpu_abs_width fixed width ---
+
+#[test]
+fn mem_abs_width_covers_all_used_values() {
+    let mut state = ttop::memory::MemState::new();
+    state.update(60);
+    let fixed_w = mem_abs_width(&state);
+
+    let test_values: &[u64] = &[
+        0,
+        1023,
+        1024,
+        1_048_575,
+        1_048_576,
+        state.current.mem_total_kb,
+    ];
+    for &used in test_values {
+        if used > state.current.mem_total_kb {
+            continue;
+        }
+        let text = format_mem_pair(used, state.current.mem_total_kb);
+        assert!(
+            text.len() <= fixed_w,
+            "RAM format_mem_pair({used}, {}) = \"{text}\" ({} chars) exceeds fixed width {fixed_w}",
+            state.current.mem_total_kb,
+            text.len()
+        );
+    }
+}
+
+#[test]
+fn mem_abs_width_equals_max_mem_pair_width() {
+    let state = ttop::memory::MemState::new();
+    let expected = max_mem_pair_width(state.current.mem_total_kb)
+        .max(max_mem_pair_width(state.current.swap_total_kb));
+    assert_eq!(mem_abs_width(&state), expected);
+}
+
+#[test]
+fn gpu_abs_width_covers_all_used_values() {
+    let gpu = ttop::gpu::GpuState::new();
+    let fixed_w = gpu_abs_width(&gpu);
+
+    let test_values: &[u64] = &[0, 1023, 1024, 1_048_575, gpu.current_mem_total_kb];
+    for &used in test_values {
+        if used > gpu.current_mem_total_kb {
+            continue;
+        }
+        let text = format_mem_pair(used, gpu.current_mem_total_kb);
+        assert!(
+            text.len() <= fixed_w,
+            "GPU format_mem_pair({used}, {}) = \"{text}\" ({} chars) exceeds fixed width {fixed_w}",
+            gpu.current_mem_total_kb,
+            text.len()
+        );
+    }
+}
+
+// --- core_columns ---
 
 #[test]
 fn core_columns_zero() {

@@ -1,6 +1,6 @@
 use ttop::memory::usage::{
-    format_human_bytes, format_mem_pair, parse_meminfo, ram_usage_pct, swap_usage_pct, MemInfo,
-    MemState,
+    format_human_bytes, format_mem_pair, max_mem_pair_width, parse_meminfo, ram_usage_pct,
+    swap_usage_pct, MemInfo, MemState,
 };
 
 // --- parse_meminfo ---
@@ -175,6 +175,78 @@ fn format_mem_pair_mixed_units() {
     let total_kb = 1024 * 1024 * 1024; // 1 TiB
     let text = format_mem_pair(used_kb, total_kb);
     assert_eq!(text, "8.0GB/1.0TB");
+}
+
+// --- max_mem_pair_width ---
+
+#[test]
+fn max_mem_pair_width_zero_total() {
+    assert_eq!(max_mem_pair_width(0), "0.0GB/0.0GB".len());
+}
+
+#[test]
+fn max_mem_pair_width_covers_all_used_values() {
+    let total_kb = 16_777_216; // 16 GiB
+    let fixed_w = max_mem_pair_width(total_kb);
+
+    let test_values: &[u64] = &[
+        0,
+        512,
+        1023,
+        1024,
+        10_000,
+        500_000,
+        1_048_575,
+        1_048_576,
+        8_000_000,
+        total_kb,
+    ];
+    for &used in test_values {
+        let text = format_mem_pair(used, total_kb);
+        assert!(
+            text.len() <= fixed_w,
+            "format_mem_pair({used}, {total_kb}) = \"{text}\" ({} chars) exceeds fixed width {fixed_w}",
+            text.len()
+        );
+    }
+}
+
+#[test]
+fn max_mem_pair_width_covers_boundary_crossing() {
+    let total_kb = 16_777_216;
+    let fixed_w = max_mem_pair_width(total_kb);
+
+    // Just below GB boundary — widest in MB range: "1024.0MB"
+    let text = format_mem_pair(1_048_575, total_kb);
+    assert!(
+        text.len() <= fixed_w,
+        "boundary value produced \"{text}\" ({} chars) exceeding fixed width {fixed_w}",
+        text.len()
+    );
+}
+
+#[test]
+fn max_mem_pair_width_ge_any_actual_pair() {
+    let total_kb = 1024 * 1024 * 1024; // 1 TiB
+    let fixed_w = max_mem_pair_width(total_kb);
+
+    let test_values: &[u64] = &[
+        0,
+        1023,
+        1024,
+        1_048_575,
+        1_048_576,
+        1_073_741_823,
+        total_kb,
+    ];
+    for &used in test_values {
+        let text = format_mem_pair(used, total_kb);
+        assert!(
+            text.len() <= fixed_w,
+            "format_mem_pair({used}, {total_kb}) = \"{text}\" ({} chars) exceeds fixed width {fixed_w}",
+            text.len()
+        );
+    }
 }
 
 // --- MemState lifecycle ---

@@ -1,4 +1,5 @@
 use ttop::disk::space::{parse_proc_mounts, read_statvfs, DiskSpaceState};
+use ttop::memory::usage::{format_mem_pair, max_mem_pair_width};
 
 // --- parse_proc_mounts ---
 
@@ -161,6 +162,42 @@ fn disk_space_state_abs_text_nonempty() {
         assert!(!text.is_empty(), "abs_text should not be empty");
         assert!(text.contains('/'), "abs_text should contain slash: {text}");
     }
+}
+
+#[test]
+fn disk_space_state_abs_width_covers_all_used_values() {
+    let mut state = DiskSpaceState::new();
+    state.update(60);
+    let fixed_w = state.abs_width();
+
+    for i in 0..state.mount_count() {
+        let total = state.current_total_kb[i];
+        let test_values: &[u64] = &[0, 1023, 1024, 1_048_575, 1_048_576, total];
+        for &used in test_values {
+            if used > total {
+                continue;
+            }
+            let text = format_mem_pair(used, total);
+            assert!(
+                text.len() <= fixed_w,
+                "disk mount {i}: format_mem_pair({used}, {total}) = \"{text}\" ({} chars) exceeds fixed width {fixed_w}",
+                text.len()
+            );
+        }
+    }
+}
+
+#[test]
+fn disk_space_state_abs_width_equals_max_mem_pair_width() {
+    let mut state = DiskSpaceState::new();
+    state.update(60);
+    let expected = state
+        .current_total_kb
+        .iter()
+        .map(|&total| max_mem_pair_width(total))
+        .max()
+        .unwrap_or(0);
+    assert_eq!(state.abs_width(), expected);
 }
 
 #[test]

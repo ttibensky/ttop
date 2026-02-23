@@ -1,7 +1,7 @@
 use crate::cpu::temperature::TempState;
 use crate::gpu::GpuState;
 use crate::memory::temperature::MemTempState;
-use crate::memory::{format_mem_pair, MemState};
+use crate::memory::{max_mem_pair_width, MemState};
 
 pub fn label_width(core_count: usize) -> usize {
     if core_count == 0 {
@@ -67,16 +67,12 @@ pub fn temp_chart_width(col_with_border: usize, tlw: usize) -> usize {
     }
 }
 
-/// Compute the width of the absolute value text (e.g. `5.1GB/8.0GB`) for both
-/// RAM and SWP, returning the max so the two rows align.
+/// Compute the maximum width of the absolute value text (e.g. `5.1GB/8.0GB`)
+/// for both RAM and SWP across all possible used values, so the chart width
+/// stays stable as usage fluctuates across unit boundaries.
 pub fn mem_abs_width(mem: &MemState) -> usize {
-    let ram_used = mem.current.mem_total_kb.saturating_sub(mem.current.mem_available_kb);
-    let ram_text = format_mem_pair(ram_used, mem.current.mem_total_kb);
-
-    let swap_used = mem.current.swap_total_kb.saturating_sub(mem.current.swap_free_kb);
-    let swap_text = format_mem_pair(swap_used, mem.current.swap_total_kb);
-
-    ram_text.len().max(swap_text.len())
+    max_mem_pair_width(mem.current.mem_total_kb)
+        .max(max_mem_pair_width(mem.current.swap_total_kb))
 }
 
 /// Compute the chart width for a memory column (RAM or SWAP) in the three-column layout.
@@ -105,10 +101,10 @@ pub fn mem_temp_label_width(mem_temp: &MemTempState) -> usize {
         .max(3)
 }
 
-/// Compute the width of the absolute value text for GPU memory.
+/// Compute the maximum width of the absolute value text for GPU memory across
+/// all possible used values, so the chart width stays stable.
 pub fn gpu_abs_width(gpu: &GpuState) -> usize {
-    let text = format_mem_pair(gpu.current_mem_used_kb, gpu.current_mem_total_kb);
-    text.len()
+    max_mem_pair_width(gpu.current_mem_total_kb)
 }
 
 /// Compute the chart width for a disk space column.

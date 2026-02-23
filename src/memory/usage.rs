@@ -94,6 +94,37 @@ pub fn format_mem_pair(used_kb: u64, total_kb: u64) -> String {
     format!("{}/{}", format_human_bytes(used_kb), format_human_bytes(total_kb))
 }
 
+/// Compute the widest possible `format_mem_pair` output for any `used_kb` in
+/// `[0, total_kb]`. The `used` side can cross unit boundaries (KB/MB/GB/TB),
+/// so we check the boundary values that produce the widest strings.
+pub fn max_mem_pair_width(total_kb: u64) -> usize {
+    if total_kb == 0 {
+        return "0.0GB/0.0GB".len();
+    }
+
+    let total_text_len = format_human_bytes(total_kb).len();
+
+    // Just below each unit transition produces the widest string in that range.
+    // KB→MB at 1024 KB, MB→GB at 1048576 KB, GB→TB at 1073741824 KB.
+    const BOUNDARY_VALUES: &[u64] = &[
+        0,
+        1023,        // widest KB: "1023KB"
+        1048575,     // widest MB: "1024.0MB"
+        1073741823,  // widest GB: "1024.0GB"
+    ];
+
+    let max_used_len = BOUNDARY_VALUES
+        .iter()
+        .copied()
+        .chain(std::iter::once(total_kb))
+        .filter(|&v| v <= total_kb)
+        .map(|v| format_human_bytes(v).len())
+        .max()
+        .unwrap_or(0);
+
+    max_used_len + 1 + total_text_len
+}
+
 impl Default for MemState {
     fn default() -> Self {
         Self::new()
