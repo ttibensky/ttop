@@ -81,30 +81,7 @@ Three-column "GPU" section box below Memory, with GPU Utilization, VRAM Utilizat
 8. **Color reuse** — USE and MEM columns use `utilization_color()`; TMP column uses `temperature_color()` and `sparkline_char_temp()`
 9. **Graceful degradation** — section not rendered when no GPU detected; temperature column shows `N/A°C (N/A°F)` if no hwmon found
 
-## Phase 5: Fan Speeds (CPU + GPU)
-
-Add fan speed monitoring to the CPU and GPU sections. Fan RPM sparklines displayed alongside existing temperature data in each section's Temperature column.
-
-### CPU / Case Fans
-
-- **Generic hwmon fan discovery** — scan all `/sys/class/hwmon/` devices for `fanN_input` files, regardless of driver name (covers `nct6775`, `it87`, `f71882fg`, `asus-ec-sensors`, and other Super I/O chip drivers)
-- **Filter out GPU fans** — exclude hwmon devices already claimed by the GPU backend (`amdgpu`) to avoid duplicates
-- **Fan labels** — use `fanN_label` if present (e.g., "CPU Fan", "System Fan 1"), otherwise fall back to `Fan 0`, `Fan 1`, etc.
-- **RPM reading** — read integer RPM from `fanN_input` each tick
-- **Sparkline rendering** — auto-scaling range (0 to max observed RPM), displayed as `NNNN RPM` next to each sparkline
-- **Layout** — fan rows appended below temperature rows in the CPU section's Temperature column, separated by a subtle divider or distinct label prefix
-
-### GPU Fan
-
-- **AMD** — read `fan1_input` (RPM) from the existing `amdgpu` hwmon path already discovered during GPU detection
-- **NVIDIA** — add `fan.speed` to the existing `nvidia-smi` query (returns percentage, not RPM)
-- **Layout** — fan sparkline row appended below the temperature row in the GPU section's Temperature column, labeled `FAN` with `NNNN RPM` (AMD) or `NN%` (NVIDIA)
-
-### Color scheme
-
-- Fan speed colors: green (0–30%), yellow (31–60%), orange (61–80%), red (81–100%) relative to the max observed RPM (or directly from percentage for NVIDIA)
-
-## Phase 6: Disk (Space + I/O)
+## Phase 5: Disk (Space + I/O)
 
 - New `src/disk/` module with `DiskSpaceState` and `DiskIoState` structs
 - **Space usage** (left half):
@@ -122,14 +99,14 @@ Add fan speed monitoring to the CPU and GPU sections. Fan RPM sparklines display
 - Side-by-side "Disk" section box (same layout pattern as CPU)
 - Add `libc` as direct dependency (already a transitive dep of `crossterm`, zero cost)
 
-## Phase 7: Polish
+## Phase 6: Polish
 
 - Graceful handling of missing hardware (no GPU, no temp sensors)
 - Error resilience (permission denied, file not found, malformed data)
 - Command-line arguments (refresh rate override, disable sections, etc.)
 - Man page or `--help` documentation
 
-## Phase 8: PPA Distribution
+## Phase 7: PPA Distribution
 
 Publish ttop as a PPA so users can install it with `sudo apt install ttop`.
 
@@ -153,7 +130,7 @@ Publish ttop as a PPA so users can install it with `sudo apt install ttop`.
    - GPG signing key stored as GitHub Actions secret
 4. **README update** — add `apt install` instructions to the Installation section
 
-## Phase 9: Performance Benchmarks
+## Phase 8: Performance Benchmarks
 
 Run a resource-usage comparison of `ttop` vs `top` vs `htop` and publish the results in the README.
 
@@ -172,7 +149,7 @@ Run a resource-usage comparison of `ttop` vs `top` vs `htop` and publish the res
 |----------|--------|-----------|
 | Language | Rust | Performance, safety, single binary distribution |
 | Terminal library | `crossterm` | Minimal, cross-platform terminal control without a full TUI framework |
-| Data source | `/proc/stat`, `/sys/class/hwmon/` (coretemp/k10temp, jc42, amdgpu, Super I/O fan drivers), `/proc/meminfo`, `nvidia-smi`, `/sys/class/drm/`, `/proc/mounts`, `statvfs`, `/proc/diskstats` | Kernel interfaces + vendor CLI where sysfs is unavailable |
+| Data source | `/proc/stat`, `/sys/class/hwmon/` (coretemp/k10temp, jc42, amdgpu), `/proc/meminfo`, `nvidia-smi`, `/sys/class/drm/`, `/proc/mounts`, `statvfs`, `/proc/diskstats` | Kernel interfaces + vendor CLI where sysfs is unavailable |
 | Chart type | Single-row sparklines (`▁▂▃▄▅▆▇█`) | Compact enough to show all cores on one screen, 8 levels of vertical resolution per row |
 | Chart width | Dynamic (fills terminal width) | Wider terminals show more history; adapts on resize |
 | Color scheme | Green → Yellow → Orange → Red | Intuitive severity gradient, readable on dark backgrounds |
