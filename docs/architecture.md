@@ -84,7 +84,9 @@ Temperature values in sysfs are in millidegrees Celsius (e.g., `46375` = 46.375�
 
 **Integrated GPUs:** even on AMD APUs where the GPU is on the same die, Linux exposes CPU and GPU temperatures as separate hwmon devices (`k10temp` for CPU, `amdgpu` for GPU). They are handled by different modules: `src/cpu/temperature.rs` and future `src/gpu/temperature.rs`.
 
-### Memory — `/proc/meminfo` (future)
+### Memory — `/proc/meminfo`
+
+The kernel exposes memory statistics in `/proc/meminfo`:
 
 ```
 MemTotal:       16384000 kB
@@ -93,8 +95,12 @@ SwapTotal:       8192000 kB
 SwapFree:        7700000 kB
 ```
 
+The parser reads the file each tick and extracts four fields by key name. Values are in kilobytes.
+
 - RAM usage: `(MemTotal - MemAvailable) / MemTotal * 100`
 - Swap usage: `(SwapTotal - SwapFree) / SwapTotal * 100`
+
+**Swap-disabled handling:** when `SwapTotal == 0`, the swap percentage is 0 and the SWP row renders in dim gray with `0.0GB/0.0GB   0%`.
 
 ### GPU — vendor-specific (future)
 
@@ -107,17 +113,21 @@ SwapFree:        7700000 kB
 
 ```
 src/
-├── lib.rs                # library crate root, re-exports cpu and ui modules
+├── lib.rs                # library crate root, re-exports cpu, memory, and ui modules
 ├── main.rs               # binary entry point, terminal init, event loop
 ├── cpu/
 │   ├── mod.rs            # re-exports CpuState, CpuTimes, TempState
 │   ├── utilization.rs    # /proc/stat parsing, per-core usage history
 │   └── temperature.rs    # hwmon discovery, sysfs temp reading, history
+├── memory/
+│   ├── mod.rs            # re-exports MemState, MemInfo
+│   └── usage.rs          # /proc/meminfo parsing, RAM+swap usage history
 └── ui.rs                 # rendering: layout, sparklines, colors, frame composition
 
 tests/
 ├── cpu_temperature.rs    # temperature module tests
 ├── cpu_utilization.rs    # CPU utilization module tests
+├── memory_usage.rs       # memory usage module tests
 └── ui.rs                 # UI rendering tests
 ```
 
@@ -129,6 +139,7 @@ All tests are external integration tests that import from the `ttop` library cra
 initialize terminal (alternate screen, raw mode, hide cursor)
 take initial /proc/stat snapshot
 discover temperature sensors via hwmon
+take initial /proc/meminfo snapshot
 
 loop every 1 second:
     poll for key events (non-blocking)
@@ -136,6 +147,7 @@ loop every 1 second:
 
     read /proc/stat → compute per-core utilization deltas
     read hwmon tempN_input → current temperatures
+    read /proc/meminfo → compute RAM and swap usage percentages
     push new values into history buffers
 
     calculate layout dimensions (left/right halves from terminal size)
@@ -165,6 +177,19 @@ struct TempSensor {
 struct TempState {
     sensors: Vec<TempSensor>,
     histories: Vec<VecDeque<f64>>,     // one per sensor, values in °C
+}
+
+struct MemInfo {
+    mem_total_kb: u64,
+    mem_available_kb: u64,
+    swap_total_kb: u64,
+    swap_free_kb: u64,
+}
+
+struct MemState {
+    ram_history: VecDeque<f64>,        // RAM usage percentage
+    swap_history: VecDeque<f64>,       // swap usage percentage
+    current: MemInfo,                  // latest raw values for absolute display
 }
 ```
 

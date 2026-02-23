@@ -1,7 +1,8 @@
 use ttop::cpu::temperature::TempState;
 use ttop::cpu::utilization::CpuState;
+use ttop::memory::MemState;
 use ttop::ui::{
-    label_width, left_chart_width, render_frame, right_chart_width, sparkline_char,
+    label_width, left_chart_width, mem_chart_width, render_frame, right_chart_width, sparkline_char,
     sparkline_char_temp, temperature_color, utilization_color, COLOR_GREEN, COLOR_ORANGE,
     COLOR_RED, COLOR_YELLOW, SPARKLINE_CHARS,
 };
@@ -192,7 +193,8 @@ fn right_chart_width_very_narrow() {
 fn render_frame_contains_cpu_section() {
     let cpu = CpuState::new();
     let temp = TempState::new();
-    let frame = render_frame(&cpu, &temp, 120, 40);
+    let mem = MemState::new();
+    let frame = render_frame(&cpu, &temp, &mem, 120, 40);
     let stripped = strip_ansi(&frame);
     assert!(stripped.contains("CPU"), "frame should contain CPU header");
 }
@@ -201,7 +203,8 @@ fn render_frame_contains_cpu_section() {
 fn render_frame_contains_subtitles() {
     let cpu = CpuState::new();
     let temp = TempState::new();
-    let frame = render_frame(&cpu, &temp, 120, 40);
+    let mem = MemState::new();
+    let frame = render_frame(&cpu, &temp, &mem, 120, 40);
     let stripped = strip_ansi(&frame);
     assert!(
         stripped.contains("Utilization"),
@@ -217,7 +220,8 @@ fn render_frame_contains_subtitles() {
 fn render_frame_contains_status_bar() {
     let cpu = CpuState::new();
     let temp = TempState::new();
-    let frame = render_frame(&cpu, &temp, 120, 40);
+    let mem = MemState::new();
+    let frame = render_frame(&cpu, &temp, &mem, 120, 40);
     let stripped = strip_ansi(&frame);
     assert!(stripped.contains("q: quit"));
     assert!(stripped.contains("ttop v0.1"));
@@ -227,7 +231,8 @@ fn render_frame_contains_status_bar() {
 fn render_frame_contains_all_core_labels() {
     let cpu = CpuState::new();
     let temp = TempState::new();
-    let frame = render_frame(&cpu, &temp, 120, 60);
+    let mem = MemState::new();
+    let frame = render_frame(&cpu, &temp, &mem, 120, 60);
     let stripped = strip_ansi(&frame);
     for i in 0..cpu.core_count() {
         assert!(
@@ -242,7 +247,8 @@ fn render_frame_contains_all_core_labels() {
 fn render_frame_has_box_drawing_chars() {
     let cpu = CpuState::new();
     let temp = TempState::new();
-    let frame = render_frame(&cpu, &temp, 120, 40);
+    let mem = MemState::new();
+    let frame = render_frame(&cpu, &temp, &mem, 120, 40);
     let stripped = strip_ansi(&frame);
     assert!(stripped.contains('╭'));
     assert!(stripped.contains('╮'));
@@ -254,7 +260,8 @@ fn render_frame_has_box_drawing_chars() {
 fn render_frame_contains_vertical_separator() {
     let cpu = CpuState::new();
     let temp = TempState::new();
-    let frame = render_frame(&cpu, &temp, 120, 40);
+    let mem = MemState::new();
+    let frame = render_frame(&cpu, &temp, &mem, 120, 40);
     let stripped = strip_ansi(&frame);
     let lines: Vec<&str> = stripped.lines().collect();
     if lines.len() > 2 {
@@ -271,11 +278,59 @@ fn render_frame_contains_vertical_separator() {
 fn render_frame_shows_temp_or_na() {
     let cpu = CpuState::new();
     let temp = TempState::new();
-    let frame = render_frame(&cpu, &temp, 120, 40);
+    let mem = MemState::new();
+    let frame = render_frame(&cpu, &temp, &mem, 120, 40);
     let stripped = strip_ansi(&frame);
     let has_temp = stripped.contains("°C") && stripped.contains("°F");
     let has_na = stripped.contains("N/A");
     assert!(has_temp || has_na, "frame should show temperature or N/A");
+}
+
+#[test]
+fn render_frame_contains_memory_section() {
+    let cpu = CpuState::new();
+    let temp = TempState::new();
+    let mem = MemState::new();
+    let frame = render_frame(&cpu, &temp, &mem, 120, 60);
+    let stripped = strip_ansi(&frame);
+    assert!(stripped.contains("Memory"), "frame should contain Memory header");
+}
+
+#[test]
+fn render_frame_contains_ram_and_swp_labels() {
+    let cpu = CpuState::new();
+    let temp = TempState::new();
+    let mem = MemState::new();
+    let frame = render_frame(&cpu, &temp, &mem, 120, 60);
+    let stripped = strip_ansi(&frame);
+    assert!(stripped.contains("RAM"), "frame should contain RAM label");
+    assert!(stripped.contains("SWP"), "frame should contain SWP label");
+}
+
+#[test]
+fn mem_chart_width_standard() {
+    let cw = mem_chart_width(100, 9);
+    assert_eq!(cw, 100 - 13 - 9);
+}
+
+#[test]
+fn mem_chart_width_very_narrow() {
+    let cw = mem_chart_width(10, 9);
+    assert_eq!(cw, 8);
+}
+
+#[test]
+fn mem_chart_width_short_abs() {
+    // "5.1GB/8.0GB" = 12 chars
+    let cw = mem_chart_width(100, 12);
+    assert_eq!(cw, 100 - 13 - 12);
+}
+
+#[test]
+fn mem_chart_width_long_abs() {
+    // "999.8GB/999.9GB" = 15 chars
+    let cw = mem_chart_width(100, 15);
+    assert_eq!(cw, 100 - 13 - 15);
 }
 
 fn strip_ansi(s: &str) -> String {

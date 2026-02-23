@@ -9,7 +9,11 @@ use crossterm::{
 };
 
 use ttop::cpu::{CpuState, TempState};
-use ttop::ui::{label_width, left_chart_width, render_frame, right_chart_width, temp_label_width};
+use ttop::memory::MemState;
+use ttop::ui::{
+    label_width, left_chart_width, mem_abs_width, mem_chart_width, render_frame, right_chart_width,
+    temp_label_width,
+};
 
 const TICK_INTERVAL: Duration = Duration::from_secs(1);
 
@@ -38,6 +42,7 @@ fn main() -> io::Result<()> {
     let mut stdout = io::stdout();
     let mut cpu = CpuState::new();
     let mut temp = TempState::new();
+    let mut mem = MemState::new();
 
     loop {
         let tick_start = Instant::now();
@@ -56,7 +61,11 @@ fn main() -> io::Result<()> {
         let rcw = right_chart_width(right_half, tlw);
         temp.update(rcw);
 
-        let frame = render_frame(&cpu, &temp, cols, rows);
+        let aw = mem_abs_width(&mem);
+        let mcw = mem_chart_width(total_inner, aw);
+        mem.update(mcw);
+
+        let frame = render_frame(&cpu, &temp, &mem, cols, rows);
         stdout.write_all(frame.as_bytes())?;
         stdout.flush()?;
 

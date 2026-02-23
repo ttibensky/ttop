@@ -33,16 +33,21 @@ Side-by-side layout: utilization sparklines on the left half, temperature sparkl
 10. **N/A fallback** — `N/A°C (N/A°F)` with dim styling when no sensors found
 11. **Top-aligned rows** — temperature rows top-aligned on right; empty space below if fewer sensors than cores
 
-## Phase 3: Memory (RAM + Swap)
+## Phase 3: Memory (RAM + Swap) ✓
 
-- Parse `/proc/meminfo` for `MemTotal`, `MemAvailable`, `SwapTotal`, `SwapFree`
-- New `src/memory/` module with `MemState` struct (rolling history per metric)
-- RAM usage: `(MemTotal - MemAvailable) / MemTotal * 100`
-- Swap usage: `(SwapTotal - SwapFree) / SwapTotal * 100`
-- Full-width "Memory" section box with two sparkline rows (RAM, SWP)
-- Show absolute values alongside percentages (e.g., `5.6/16.0G  35%`)
-- Reuse existing `utilization_color()` and `sparkline_char()` for coloring
-- Graceful handling when swap is disabled (swap_total == 0)
+Full-width "Memory" section box below the CPU section, with sparkline rows for RAM and swap usage.
+
+### Deliverables
+
+1. **`/proc/meminfo` parser** — extract `MemTotal`, `MemAvailable`, `SwapTotal`, `SwapFree` each tick
+2. **New `src/memory/` module** — `MemInfo` (raw kB values), `MemState` (rolling `VecDeque<f64>` history per metric)
+3. **RAM usage** — `(MemTotal - MemAvailable) / MemTotal * 100`
+4. **Swap usage** — `(SwapTotal - SwapFree) / SwapTotal * 100`
+5. **Full-width Memory section** — boxed section with two sparkline rows (`RAM`, `SWP`)
+6. **Absolute values** — show `usedU/totalU` alongside percentage (e.g., `5.6GB/16.0GB  35%`); each value carries its own unit so mixed scales like `8.0GB/1.0TB` are unambiguous
+7. **Human-readable formatting** — `format_human_bytes()` and `format_mem_pair()` with per-value adaptive units (KB/MB/GB/TB)
+8. **Color reuse** — memory sparklines use existing `utilization_color()` and `sparkline_char()`
+9. **Swap-disabled handling** — when `SwapTotal == 0`, SWP row renders in dim gray with `0.0GB/0.0GB   0%`
 
 ## Phase 4: GPU
 

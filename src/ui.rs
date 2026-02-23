@@ -3,6 +3,7 @@ use std::fmt::Write;
 
 use crate::cpu::temperature::{self, TempState};
 use crate::cpu::utilization::CpuState;
+use crate::memory::{format_mem_pair, MemState};
 
 pub const SPARKLINE_CHARS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
@@ -84,6 +85,31 @@ pub fn right_chart_width(half_cols: usize, tlw: usize) -> usize {
     let fixed = tlw + 18;
     if half_cols > fixed {
         half_cols - fixed
+    } else {
+        8
+    }
+}
+
+/// Compute the width of the absolute value text (e.g. `5.1GB/8.0GB`) for both
+/// RAM and SWP, returning the max so the two rows align.
+pub fn mem_abs_width(mem: &MemState) -> usize {
+    let ram_used = mem.current.mem_total_kb.saturating_sub(mem.current.mem_available_kb);
+    let ram_text = format_mem_pair(ram_used, mem.current.mem_total_kb);
+
+    let swap_used = mem.current.swap_total_kb.saturating_sub(mem.current.swap_free_kb);
+    let swap_text = format_mem_pair(swap_used, mem.current.swap_total_kb);
+
+    ram_text.len().max(swap_text.len())
+}
+
+/// Compute the chart width for a full-width memory row.
+/// `inner_cols` is the space between the two `│` border characters (cols − 2).
+/// Inner layout: " " + label(3) + " " + chart + " " + abs + "  " + "NNN%" + " "
+///                1   + 3        + 1   + cw    + 1   + aw  + 2    + 4      + 1  = 13 + aw + cw
+pub fn mem_chart_width(inner_cols: usize, abs_w: usize) -> usize {
+    let fixed = 13 + abs_w;
+    if inner_cols > fixed {
+        inner_cols - fixed
     } else {
         8
     }
@@ -194,6 +220,65 @@ fn render_na_temp_row(buf: &mut String, tlw: usize, cw: usize, half_width: usize
     let _ = write!(buf, " {COLOR_DIM_GRAY}│{COLOR_RESET}");
 }
 
+fn render_mem_row(
+    buf: &mut String,
+    label: &str,
+    history: &VecDeque<f64>,
+    cw: usize,
+    abs_formatted: &str,
+    inner: usize,
+    dim: bool,
+) {
+    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET} ");
+    let _ = write!(buf, "{COLOR_WHITE}{:<3}{COLOR_RESET} ", label);
+
+    let data_len = history.len();
+    let empty_slots = cw.saturating_sub(data_len);
+
+    if dim {
+        for _ in 0..cw {
+            let _ = write!(buf, "{COLOR_DIM_CHART}▁{COLOR_RESET}");
+        }
+    } else {
+        for _ in 0..empty_slots {
+            let _ = write!(buf, "{COLOR_DIM_CHART}▁{COLOR_RESET}");
+        }
+        for &val in history.iter().skip(data_len.saturating_sub(cw)) {
+            let ch = sparkline_char(val);
+            let color = utilization_color(val);
+            let _ = write!(buf, "{color}{ch}{COLOR_RESET}");
+        }
+    }
+
+    let current_pct = history.back().copied().unwrap_or(0.0);
+    let abs_w = abs_formatted.len();
+
+    if dim {
+        let _ = write!(buf, " {COLOR_DIM_GRAY}{abs_formatted}{COLOR_RESET}");
+        let _ = write!(buf, "  {COLOR_DIM_GRAY}{:>3.0}%{COLOR_RESET}", current_pct);
+    } else {
+        let color = utilization_color(current_pct);
+        let _ = write!(buf, " {color}{abs_formatted}{COLOR_RESET}");
+        let _ = write!(buf, "  {color}{:>3.0}%{COLOR_RESET}", current_pct);
+    }
+
+    let used = 2 + 3 + 1 + cw + 1 + abs_w + 2 + 4;
+    let pad = inner.saturating_sub(used);
+    for _ in 0..pad {
+        buf.push(' ');
+    }
+    let _ = write!(buf, " {COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
+}
+
+fn render_mem_separator(buf: &mut String, cols: u16) {
+    let inner = (cols as usize).saturating_sub(2);
+    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+    for _ in 0..inner {
+        buf.push(' ');
+    }
+    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
+}
+
 fn render_horizontal_border(
     buf: &mut String,
     left: char,
@@ -268,7 +353,7 @@ fn render_separator_line(buf: &mut String, left_half: usize, terminal_cols: u16)
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
 }
 
-pub fn render_frame(cpu: &CpuState, temp: &TempState, cols: u16, rows: u16) -> String {
+pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, cols: u16, rows: u16) -> String {
     let total_inner = (cols as usize).saturating_sub(2);
     let left_half = total_inner / 2 + 1; // +1 for the left border │
     let right_half = (cols as usize).saturating_sub(left_half + 1); // -1 for center separator │
@@ -323,9 +408,36 @@ pub fn render_frame(cpu: &CpuState, temp: &TempState, cols: u16, rows: u16) -> S
     render_separator_line(&mut buf, left_half, cols);
     render_horizontal_border(&mut buf, '╰', '╯', cols, None);
 
+    // --- Memory section ---
+    let aw = mem_abs_width(mem);
+    let mcw = mem_chart_width(total_inner, aw);
+
+    let ram_used_kb = mem.current.mem_total_kb.saturating_sub(mem.current.mem_available_kb);
+    let ram_abs = format!("{:>width$}", format_mem_pair(ram_used_kb, mem.current.mem_total_kb), width = aw);
+
+    let swap_used_kb = mem.current.swap_total_kb.saturating_sub(mem.current.swap_free_kb);
+    let swap_abs = format!("{:>width$}", format_mem_pair(swap_used_kb, mem.current.swap_total_kb), width = aw);
+
+    render_horizontal_border(&mut buf, '╭', '╮', cols, Some("Memory"));
+    render_mem_separator(&mut buf, cols);
+    render_mem_row(&mut buf, "RAM", &mem.ram_history, mcw, &ram_abs, total_inner, false);
+    render_mem_row(
+        &mut buf,
+        "SWP",
+        &mem.swap_history,
+        mcw,
+        &swap_abs,
+        total_inner,
+        !mem.swap_available(),
+    );
+    render_mem_separator(&mut buf, cols);
+    render_horizontal_border(&mut buf, '╰', '╯', cols, None);
+
     // fill remaining rows
-    let cpu_lines = row_count + 4;
-    let remaining_lines = (rows as usize).saturating_sub(cpu_lines + 1);
+    // CPU: 4 border/subtitle/separator lines + row_count data rows
+    // Memory: 4 border/separator lines + 2 data rows
+    let used_lines = (row_count + 4) + 6;
+    let remaining_lines = (rows as usize).saturating_sub(used_lines + 1);
     for _ in 0..remaining_lines {
         let _ = write!(buf, "\x1b[K\r\n");
     }

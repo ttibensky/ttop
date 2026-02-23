@@ -50,7 +50,11 @@ The screen is divided into independent boxed sections, stacked vertically:
    - A vertical `│` separator divides the halves
    - Temperature rows are **top-aligned**: if there are fewer sensors than CPU cores, remaining right-half rows are blank
    - If no sensors found: a single `N/A°C (N/A°F)` row with dim styling
-2. **Memory** (future) — one row for RAM, one for swap
+2. **Memory** — full-width section with two sparkline rows:
+   - **RAM row:** labeled `RAM`, sparkline chart, absolute values (`usedU/totalU`), current percentage
+   - **SWP row:** labeled `SWP`, sparkline chart, absolute values, current percentage
+   - Uses `utilization_color()` color thresholds (same as CPU utilization)
+   - When swap is disabled (`SwapTotal == 0`): SWP row renders entirely in dim gray with `0.0GB/0.0GB   0%`
 3. **GPU** (future) — one row for utilization, one for memory (GPU name in section title)
 
 Each section is enclosed in a box using Unicode box-drawing characters (`╭╮╰╯│─`) and has a labeled header. Sections are visually separated by the gap between boxes.
@@ -117,6 +121,17 @@ Empty (no-data) positions render as a dim `▁` character to maintain the visual
 - **Label:** right-aligned, fixed width — sensor label (e.g., `Tctl`, `Core 0`)
 - **Sparkline:** variable width, fills available right-half space
 - **Current value:** dual Celsius/Fahrenheit display, or `N/A°C (N/A°F)` if unavailable
+
+### Memory Row (full-width)
+
+```
+│ {label} {sparkline_chart} {used/totalU}  {NNN}% │
+```
+
+- **Label:** left-aligned, 3 characters — `RAM` or `SWP`
+- **Sparkline:** variable width, fills available space (full terminal width minus fixed elements)
+- **Absolute values:** `usedU/totalU` where each value carries its own adaptive unit (KB/MB/GB/TB), allowing unambiguous display when scales differ (e.g., `8.0GB/1.0TB`)
+- **Current value:** right-aligned 3-character percentage, colored by `utilization_color()`
 
 ## Color Scheme
 
