@@ -164,15 +164,36 @@ src/
 │   ├── mod.rs            # re-exports MemState, MemInfo, MemTempState
 │   ├── temperature.rs    # jc42 hwmon discovery, DIMM temp reading, history
 │   └── usage.rs          # /proc/meminfo parsing, RAM+swap usage history
-└── ui.rs                 # rendering: layout, sparklines, colors, frame composition
+└── ui/
+    ├── mod.rs            # re-exports, shared rendering primitives, render_frame()
+    ├── colors.rs         # ANSI color constants, sparkline helpers, color selectors
+    ├── layout.rs         # pure layout-math functions (column widths, core distribution)
+    ├── cpu.rs            # CPU utilization/temperature row rendering
+    ├── memory.rs         # Memory (RAM/swap) row rendering
+    └── gpu.rs            # GPU utilization/memory/temperature row rendering
 
 tests/
-├── cpu_temperature.rs    # temperature module tests
-├── cpu_utilization.rs    # CPU utilization module tests
-├── gpu.rs                # GPU module tests
-├── memory_temperature.rs # DIMM temperature module tests
-├── memory_usage.rs       # memory usage module tests
-└── ui.rs                 # UI rendering tests
+├── cpu.rs                # crate root, declares temperature + utilization submodules
+├── cpu/
+│   ├── temperature.rs    # temperature module tests
+│   └── utilization.rs    # CPU utilization module tests
+├── gpu.rs                # crate root, declares state + nvidia + amd submodules
+├── gpu/
+│   ├── state.rs          # GpuState lifecycle and integration tests
+│   ├── nvidia.rs         # NVIDIA detection and snapshot tests
+│   └── amd.rs            # AMD detection and sysfs reading tests
+├── memory.rs             # crate root, declares temperature + usage submodules
+├── memory/
+│   ├── temperature.rs    # DIMM temperature module tests
+│   └── usage.rs          # memory usage module tests
+├── ui.rs                 # crate root, declares colors + layout + render + cpu + memory + gpu submodules
+└── ui/
+    ├── colors.rs          # sparkline character + color function tests
+    ├── layout.rs          # layout math tests (label widths, column splits, chart widths)
+    ├── render.rs          # render_frame integration tests
+    ├── cpu.rs             # CPU row rendering tests
+    ├── memory.rs          # memory row rendering tests
+    └── gpu.rs             # GPU row rendering tests
 ```
 
 All tests are external integration tests that import from the `ttop` library crate. Test files mirror the source module they cover.
