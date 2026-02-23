@@ -29,6 +29,13 @@ The CPU section uses a **multi-column layout**: the first two thirds display uti
 │ USE ▅▅▅▆▆▇▆▆▅▅▅▆▆▇  72%  │ MEM ▃▃▃▃▃▃  4.2GB/24.0GB  40% │ TMP ▃▃▃▃▃▃  52°C (126°F)│
 │                            │                             │                              │
 ╰─────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Disk ──────────────────────────────────────────────────────────────────────────────────╮
+│                Space                    │                 I/O                            │
+│ /      ▃▃▃▃▃▃▃▃  120.5GB/500.0GB  24% │ sdaR ▁▁▁▁▁▁▁▁▁▁▁▁▂▃▂▁  45.2MB/s             │
+│ /home  ▅▅▅▅▅▅▅▅  850.3GB/1.0TB    83% │ sdaW ▁▁▁▁▁▁▁▁▁▁▁▁▁▂▁▁  12.8MB/s             │
+│ /boot  ▂▂▂▂▂▂▂▂  180.0MB/512.0MB  35% │                                               │
+│                                         │                                               │
+╰─────────────────────────────────────────────────────────────────────────────────────────╯
                                                                         q: quit  ttop v0.1
 ```
 
@@ -67,10 +74,18 @@ The screen is divided into independent boxed sections, stacked vertically:
    - GPU product name displayed in section title: `╭─ GPU: <name> ─╮`
    - When no GPU is detected, the entire section is omitted
    - When temperature is unavailable: TMP column shows `N/A°C (N/A°F)` with dim styling
+4. **Disk** — side-by-side layout (50% space + 50% I/O):
+   - **Left half (Space):** subtitle "Space" (bold cyan, centered), one sparkline row per physical filesystem (only mounts on `/dev/sd*`, `/dev/nvme*`, `/dev/vd*`, `/dev/xvd*`, `/dev/hd*`, `/dev/mmcblk*`; squashfs/fuse.snapfuse excluded). Each row shows a utilization sparkline (colored by `utilization_color()`), absolute values (`usedU/totalU`), and percentage.
+   - **Right half (I/O):** subtitle "I/O" (bold cyan, centered), two sparkline rows per whole-disk device — one for reads (suffixed `R`, e.g., `sdaR`) and one for writes (suffixed `W`, e.g., `sdaW`). Virtual devices (`loop*`, `ram*`, `dm-*`, `sr*`, `fd*`) are excluded. Sparklines are auto-scaled (0 to max observed value per device) using `sparkline_char_scaled()`. Rate shown with adaptive unit (`B/s`, `KB/s`, `MB/s`, `GB/s`).
+   - Vertical `│` separator divides the two halves
+   - Row count is `max(filesystem_count, device_count * 2)` — whichever side needs more rows, the shorter side is padded with blanks
+   - Section is shown whenever at least one filesystem or device is discovered (always true on real systems)
+   - I/O sparklines use `io_color()`: green (0–30% of max), yellow (31–60%), orange (61–80%), red (81–100%)
+   - First tick after startup shows no I/O data (delta requires two samples); data appears from second tick onward
 
 Each section is enclosed in a box using Unicode box-drawing characters (`╭╮╰╯│─`) and has a labeled header. Sections are visually separated by the gap between boxes.
 
-Future widgets (disk I/O, network, etc.) are added as new boxed sections without disturbing existing ones.
+Future widgets (network, etc.) are added as new boxed sections without disturbing existing ones.
 
 ## Sparkline Charts
 
@@ -119,7 +134,7 @@ Empty (no-data) positions render as a dim `▁` character to maintain the visual
 │ {label} {sparkline_chart} {NNN}% │ {label} {sparkline_chart} {NNN}% │
 ```
 
-- **Label:** left-aligned, fixed width — `#0`–`#N` for CPU cores (with trailing space padding), `RAM`/`SWP` for memory, `USE`/`MEM` for GPU
+- **Label:** left-aligned, fixed width — `#0`–`#N` for CPU cores (with trailing space padding), `RAM`/`SWP` for memory, `USE`/`MEM` for GPU, mount point (e.g., `/`, `/home`) for disk space
 - **Sparkline:** variable width, fills available column space
 - **Current value:** right-aligned 3-character percentage
 - CPU threads are split into 2 or 3 sub-columns (see CPU section layout above)
@@ -144,6 +159,16 @@ Empty (no-data) positions render as a dim `▁` character to maintain the visual
 - **Temperature column:** sensor label right-aligned (e.g., `DIMM0`), temperature sparkline, dual °C/°F display — same layout as CPU temperature rows
 - **Absolute values:** `usedU/totalU` where each value carries its own adaptive unit (KB/MB/GB/TB), allowing unambiguous display when scales differ (e.g., `8.0GB/1.0TB`)
 - **Current value:** right-aligned 3-character percentage, colored by `utilization_color()`
+
+### Disk I/O Row (right column)
+
+```
+ {label} {sparkline_chart} {rate} │
+```
+
+- **Label:** left-aligned, fixed width — device name + R/W suffix (e.g., `sdaR`, `nvme0n1W`)
+- **Sparkline:** variable width, auto-scaled from 0 to max observed value per device using `sparkline_char_scaled()`
+- **Current value:** human-readable throughput rate with adaptive unit (`B/s`, `KB/s`, `MB/s`, `GB/s`)
 
 ## Color Scheme
 
@@ -180,6 +205,19 @@ N/A°C (N/A°F)    — sensor unavailable, dim gray
 
 Temperature sparklines map the range **30–100°C** to the 8 block characters (instead of 0–100% for utilization). Values below 30°C clamp to `▁`, values above 100°C clamp to `█`.
 
+### I/O Throughput Colors (per-character)
+
+I/O sparklines use a percentage-of-max-observed color scheme:
+
+| Throughput (% of max) | Color | ANSI Code |
+|-----------------------|-------|-----------|
+| 0–30% | Green | `\x1b[32m` (standard green) |
+| 31–60% | Yellow | `\x1b[33m` (standard yellow) |
+| 61–80% | Orange | `\x1b[38;5;208m` (256-color orange) |
+| 81–100% | Red | `\x1b[31m` (standard red) |
+
+The max observed value is tracked per device (maximum of all read and write values seen so far). This provides adaptive scaling — the chart visually fills up as throughput increases, and colors become "hotter" near the peak.
+
 ### Current Value Percentage
 
 The percentage number on the right side of each row is colored to match the **current (most recent)** data point's color.
@@ -189,8 +227,8 @@ The percentage number on the right side of each row is colored to match the **cu
 | Element | Color | ANSI Code |
 |---------|-------|-----------|
 | Box borders (`╭╮╰╯│─`) | Dim gray | `\x1b[90m` |
-| Section labels (`CPU`, `Memory`, `GPU`) | Bold cyan | `\x1b[1;36m` |
-| Row labels (core IDs, `RAM`, `SWP`, etc.) | White | `\x1b[37m` |
+| Section labels (`CPU`, `Memory`, `GPU`, `Disk`) | Bold cyan | `\x1b[1;36m` |
+| Row labels (core IDs, `RAM`, `SWP`, mount points, device names, etc.) | White | `\x1b[37m` |
 | Brackets and separators | Dim gray | `\x1b[90m` |
 | Empty chart positions (no data yet) | Dim gray | `\x1b[38;5;240m` |
 | Status bar (`q: quit`, version) | Dim gray | `\x1b[90m` |

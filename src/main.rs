@@ -9,11 +9,13 @@ use crossterm::{
 };
 
 use ttop::cpu::{CpuState, TempState};
+use ttop::disk::{DiskIoState, DiskSpaceState};
 use ttop::gpu::GpuState;
 use ttop::memory::{MemState, MemTempState};
 use ttop::ui::{
-    core_columns, gpu_abs_width, label_width, mem_abs_width, mem_col_chart_width,
-    mem_temp_label_width, render_frame, temp_chart_width, temp_label_width, util_chart_width,
+    core_columns, disk_io_chart_width, disk_space_chart_width, gpu_abs_width, label_width,
+    mem_abs_width, mem_col_chart_width, mem_temp_label_width, render_frame, temp_chart_width,
+    temp_label_width, util_chart_width,
 };
 
 const TICK_INTERVAL: Duration = Duration::from_secs(1);
@@ -46,6 +48,8 @@ fn main() -> io::Result<()> {
     let mut mem = MemState::new();
     let mut mem_temp = MemTempState::new();
     let mut gpu = GpuState::new();
+    let mut disk_space = DiskSpaceState::new();
+    let mut disk_io = DiskIoState::new();
 
     loop {
         let tick_start = Instant::now();
@@ -91,7 +95,22 @@ fn main() -> io::Result<()> {
         let gpu_tcw = temp_chart_width(gpu_col3 + 1, 3);
         gpu.update(gpu_ucw.max(gpu_mcw).max(gpu_tcw));
 
-        let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, cols, rows);
+        let disk_avail = (cols as usize).saturating_sub(3);
+        let disk_left = disk_avail / 2;
+        let disk_right = disk_avail - disk_left;
+        let disk_right_section = disk_right + 1;
+
+        let dslw = disk_space.label_width();
+        let dsaw = disk_space.abs_width();
+        let dscw = disk_space_chart_width(disk_left, dslw, dsaw);
+        disk_space.update(dscw);
+
+        let dilw = disk_io.label_width();
+        let dirw = disk_io.rate_width();
+        let dicw = disk_io_chart_width(disk_right_section, dilw, dirw);
+        disk_io.update(dicw);
+
+        let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, &disk_space, &disk_io, cols, rows);
         stdout.write_all(frame.as_bytes())?;
         stdout.flush()?;
 

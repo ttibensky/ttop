@@ -2,27 +2,32 @@ pub mod colors;
 pub mod layout;
 
 pub mod cpu;
+pub mod disk;
 pub mod gpu;
 pub mod memory;
 
 pub use colors::{
-    sparkline_char, sparkline_char_temp, temperature_color, utilization_color, COLOR_GREEN,
-    COLOR_ORANGE, COLOR_RED, COLOR_YELLOW, SPARKLINE_CHARS,
+    io_color, sparkline_char, sparkline_char_scaled, sparkline_char_temp, temperature_color,
+    utilization_color, COLOR_GREEN, COLOR_ORANGE, COLOR_RED, COLOR_YELLOW, SPARKLINE_CHARS,
 };
 pub use layout::{
-    core_columns, gpu_abs_width, label_width, mem_abs_width, mem_col_chart_width,
-    mem_temp_label_width, temp_chart_width, temp_label_width, util_chart_width,
+    core_columns, disk_io_chart_width, disk_space_chart_width, gpu_abs_width, label_width,
+    mem_abs_width, mem_col_chart_width, mem_temp_label_width, temp_chart_width, temp_label_width,
+    util_chart_width,
 };
 
 use std::fmt::Write;
 
 use colors::*;
 use cpu::*;
+use disk::*;
 use gpu::*;
 use memory::*;
 
 use crate::cpu::temperature::TempState;
 use crate::cpu::utilization::CpuState;
+use crate::disk::io::DiskIoState;
+use crate::disk::space::DiskSpaceState;
 use crate::gpu::GpuState;
 use crate::memory::temperature::MemTempState;
 use crate::memory::{format_mem_pair, MemState};
@@ -95,7 +100,8 @@ fn render_separator_line(buf: &mut String, col_widths: &[usize]) {
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
 }
 
-pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, mem_temp: &MemTempState, gpu: &GpuState, cols: u16, rows: u16) -> String {
+#[allow(clippy::too_many_arguments)]
+pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, mem_temp: &MemTempState, gpu: &GpuState, disk_space: &DiskSpaceState, disk_io: &DiskIoState, cols: u16, rows: u16) -> String {
     let core_count = cpu.core_count();
     let core_cols = core_columns(core_count);
     let num_util_cols = core_cols.len();
@@ -327,9 +333,104 @@ pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, mem_temp: 
         0
     };
 
+    // --- Disk section (side-by-side: Space | I/O) ---
+    let disk_lines = if disk_space.mount_count() > 0 || disk_io.device_count() > 0 {
+        let disk_avail = (cols as usize).saturating_sub(3);
+        let disk_left = disk_avail / 2;
+        let disk_right = disk_avail - disk_left;
+
+        let disk_left_section = disk_left + 1;
+        let disk_right_section = disk_right + 1;
+
+        let dslw = disk_space.label_width();
+        let dsaw = disk_space.abs_width();
+        let dscw = disk_space_chart_width(disk_left, dslw, dsaw);
+
+        let dilw = disk_io.label_width();
+        let dirw = disk_io.rate_width();
+        let dicw = disk_io_chart_width(disk_right_section, dilw, dirw);
+
+        let space_rows = disk_space.mount_count().max(1);
+        let io_rows = disk_io.device_count() * 2;
+        let disk_row_count = space_rows.max(io_rows).max(1);
+
+        let space_labels = disk_space.labels();
+        let io_labels: Vec<String> = disk_io
+            .devices
+            .iter()
+            .flat_map(|d| vec![format!("{d}R"), format!("{d}W")])
+            .collect();
+
+        render_horizontal_border(&mut buf, '╭', '╮', cols, Some("Disk"));
+        render_disk_subtitle_line(&mut buf, disk_left, disk_right);
+
+        for i in 0..disk_row_count {
+            if i < disk_space.mount_count() {
+                let abs = format!(
+                    "{:>width$}",
+                    disk_space.abs_text(i),
+                    width = dsaw
+                );
+                render_disk_space_col_first(
+                    &mut buf,
+                    space_labels[i],
+                    dslw,
+                    &disk_space.histories[i],
+                    dscw,
+                    &abs,
+                    disk_left_section,
+                );
+            } else {
+                render_empty_first_col(&mut buf, disk_left_section);
+            }
+
+            let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+
+            if i < io_rows {
+                let dev_idx = i / 2;
+                let is_write = i % 2 == 1;
+                let max_obs = disk_io.max_observed[dev_idx];
+
+                if is_write {
+                    render_disk_io_col_right(
+                        &mut buf,
+                        &io_labels[i],
+                        dilw,
+                        &disk_io.write_histories[dev_idx],
+                        dicw,
+                        max_obs,
+                        dirw,
+                        disk_right_section,
+                    );
+                } else {
+                    render_disk_io_col_right(
+                        &mut buf,
+                        &io_labels[i],
+                        dilw,
+                        &disk_io.read_histories[dev_idx],
+                        dicw,
+                        max_obs,
+                        dirw,
+                        disk_right_section,
+                    );
+                }
+            } else {
+                render_empty_right_half(&mut buf, disk_right_section);
+            }
+
+            buf.push_str("\r\n");
+        }
+
+        render_separator_line(&mut buf, &[disk_left, disk_right]);
+        render_horizontal_border(&mut buf, '╰', '╯', cols, None);
+        disk_row_count + 4
+    } else {
+        0
+    };
+
     // fill remaining rows
     let mem_lines = mem_row_count + 4;
-    let used_lines = (row_count + 4) + mem_lines + gpu_lines;
+    let used_lines = (row_count + 4) + mem_lines + gpu_lines + disk_lines;
     let remaining_lines = (rows as usize).saturating_sub(used_lines + 1);
     for _ in 0..remaining_lines {
         let _ = write!(buf, "\x1b[K\r\n");

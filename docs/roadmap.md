@@ -81,7 +81,7 @@ Three-column "GPU" section box below Memory, with GPU Utilization, VRAM Utilizat
 8. **Color reuse** — USE and MEM columns use `utilization_color()`; TMP column uses `temperature_color()` and `sparkline_char_temp()`
 9. **Graceful degradation** — section not rendered when no GPU detected; temperature column shows `N/A°C (N/A°F)` if no hwmon found
 
-## Phase 5: Disk (Space + I/O)
+## Phase 5: Disk (Space + I/O) ✓
 
 - New `src/disk/` module with `DiskSpaceState` and `DiskIoState` structs
 - **Space usage** (left half):
@@ -149,6 +149,7 @@ Run a resource-usage comparison of `ttop` vs `top` vs `htop` and publish the res
 |----------|--------|-----------|
 | Language | Rust | Performance, safety, single binary distribution |
 | Terminal library | `crossterm` | Minimal, cross-platform terminal control without a full TUI framework |
+| Disk space query | `libc::statvfs` via `libc` crate | Direct syscall, already a transitive dep of `crossterm` (zero cost); no need for a higher-level crate |
 | Data source | `/proc/stat`, `/sys/class/hwmon/` (coretemp/k10temp, jc42, amdgpu), `/proc/meminfo`, `nvidia-smi`, `/sys/class/drm/`, `/proc/mounts`, `statvfs`, `/proc/diskstats` | Kernel interfaces + vendor CLI where sysfs is unavailable |
 | Chart type | Single-row sparklines (`▁▂▃▄▅▆▇█`) | Compact enough to show all cores on one screen, 8 levels of vertical resolution per row |
 | Chart width | Dynamic (fills terminal width) | Wider terminals show more history; adapts on resize |

@@ -17,11 +17,12 @@ ttop is a lightweight alternative to `top` and `htop` focused on displaying real
 | **CPU** | Per-core utilization and per-core temperature readings (all logical processors) |
 | **Memory** | RAM and swap usage, DIMM temperature |
 | **GPU** | Utilization, memory, and temperature |
+| **Disk** | Per-filesystem space usage, per-device read/write I/O throughput |
 
 ## Design Principles
 
 - **Minimal dependencies** — reads directly from Linux kernel interfaces (`/proc/`, `/sys/`) instead of wrapping external libraries.
-- **Single external crate** — `crossterm` for terminal control (alternate screen, raw mode, cursor management, key events).
+- **Two external crates** — `crossterm` for terminal control and `libc` for `statvfs` (disk space queries; already a transitive dependency of crossterm).
 - **Readable at a glance** — color-coded sparkline charts make it easy to spot load patterns and danger zones without reading numbers.
 - **Full-screen** — uses the alternate screen buffer like htop, restoring the terminal cleanly on exit.
 
@@ -81,13 +82,13 @@ cargo clippy --tests  # also lint test code
 
 #### Tests
 
-Unit tests live inline in each source module (`src/cpu.rs`, `src/ui.rs`) inside `#[cfg(test)] mod tests { ... }` blocks. Run all tests with:
+All tests live as integration tests in the `tests/` directory, mirroring the `src/` module structure. Run all tests with:
 
 ```bash
 cargo test
 ```
 
-To add unit tests, add `#[test]` functions to the existing `mod tests` block in the relevant source file. To add integration tests, create a new `.rs` file under `tests/` — each file is compiled as a separate test binary.
+To add tests, create or extend a `.rs` file under `tests/` that mirrors the source module being tested (e.g., `tests/disk/space.rs` for `src/disk/space.rs`).
 
 #### Commit Messages
 

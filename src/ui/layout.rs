@@ -110,3 +110,27 @@ pub fn gpu_abs_width(gpu: &GpuState) -> usize {
     let text = format_mem_pair(gpu.current_mem_used_kb, gpu.current_mem_total_kb);
     text.len()
 }
+
+/// Compute the chart width for a disk space column.
+/// Layout: " " + label + " " + chart + " " + abs + "  " + "NNN%"
+///          1  + lw    + 1   + cw    + 1   + aw  + 2   + 4   = lw + aw + cw + 9
+pub fn disk_space_chart_width(col_width: usize, lw: usize, aw: usize) -> usize {
+    let fixed = lw + aw + 9;
+    if col_width > fixed {
+        col_width - fixed
+    } else {
+        8
+    }
+}
+
+/// Compute the chart width for a disk I/O column (right half with trailing │).
+/// Layout: " " + label + " " + chart + " " + rate + " │"
+///          1  + lw    + 1   + cw    + 1   + rw   + 2   = lw + rw + cw + 5
+pub fn disk_io_chart_width(col_with_border: usize, lw: usize, rw: usize) -> usize {
+    let fixed = lw + rw + 5;
+    if col_with_border > fixed {
+        col_with_border - fixed
+    } else {
+        8
+    }
+}

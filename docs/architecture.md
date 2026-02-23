@@ -11,12 +11,13 @@ The application reads system metrics from Linux kernel interfaces, maintains a r
 | Crate | Purpose |
 |-------|---------|
 | `crossterm` | Terminal control: alternate screen buffer, raw mode, cursor hiding, key event polling, 256-color output |
+| `libc` | FFI bindings for `statvfs` syscall (disk space queries). Already a transitive dependency of `crossterm`, so zero additional binary cost. |
 
 Everything else uses the Rust standard library. No system monitoring crates, no TUI frameworks.
 
 ## Data Sources
 
-All data is read from virtual filesystems provided by the Linux kernel. No external commands are spawned.
+All data is read from virtual filesystems provided by the Linux kernel, plus `libc::statvfs` for disk space. No external commands are spawned (except `nvidia-smi` for NVIDIA GPUs).
 
 ### CPU Utilization — `/proc/stat`
 
@@ -144,18 +145,54 @@ GPU data comes from vendor-specific interfaces:
 
 **Graceful degradation:** when no GPU is detected (no NVIDIA driver, no AMD card), the GPU section is not rendered at all.
 
+### Disk Space — `/proc/mounts` + `statvfs`
+
+Filesystem discovery and space usage:
+
+- **Mount discovery:** parse `/proc/mounts` line by line. Each line has format: `device mount_point fs_type options dump pass`. Two-stage filtering: (1) exclude virtual filesystem types (`tmpfs`, `sysfs`, `proc`, `devtmpfs`, `cgroup`, `debugfs`, `squashfs`, `fuse.snapfuse`, etc.) and (2) whitelist physical device prefixes (`/dev/sd`, `/dev/nvme`, `/dev/vd`, `/dev/hd`, `/dev/xvd`, `/dev/mmcblk`) to exclude snap loopbacks, FUSE mounts, and container overlay mounts. Deduplicate by mount point (keep first occurrence). Additionally, only keep mounts for which `statvfs` succeeds.
+- **Space reading:** call `libc::statvfs` on each mount point each tick. Extract `f_blocks`, `f_bfree`, `f_frsize` to compute: `total = f_blocks * f_frsize`, `used = total - (f_bfree * f_frsize)`. Convert to kilobytes.
+- **Usage percentage:** `used / total * 100`
+
+One sparkline row per filesystem, labeled by mount point (e.g., `/`, `/home`). Display format: `used/totalG  NN%` using the same `format_mem_pair()` helper from the memory module.
+
+### Disk I/O — `/proc/diskstats`
+
+The kernel exposes cumulative disk I/O counters in `/proc/diskstats`:
+
+```
+   8       0 sda 52488 2675 1124810 14760 22162 19765 830584 33936 0 35460 48696 0 0 0 0 2 0
+   8       1 sda1 52262 2675 1122506 14736 22162 19765 830584 33936 0 35436 48672 0 0 0 0 0 0
+```
+
+Relevant fields (0-indexed from the device name):
+- Field 0: device name (e.g., `sda`)
+- Field 3: sectors read (cumulative)
+- Field 7: sectors written (cumulative)
+
+**Filtering:** only physical whole-disk devices are shown. A device must (1) exist in `/sys/block/{name}` (excludes partitions like `sda1`) and (2) not match any virtual device prefix (`loop`, `ram`, `dm-`, `sr`, `fd`). This excludes snap loopback devices, device-mapper (Docker/LVM), RAM disks, optical drives, and floppy drives.
+
+**Delta computation:** each tick, compute `(current_sectors - prev_sectors) * 512` to get bytes/second per device. The first tick establishes a baseline with no data points. Separate read (R) and write (W) sparkline rows per device.
+
+**Auto-scaling:** sparklines scale from 0 to the maximum observed value for each device, using `sparkline_char_scaled()`. Rate display uses adaptive units: `B/s`, `KB/s`, `MB/s`, `GB/s`.
+
+**I/O color scheme:** green (0–30% of max), yellow (31–60%), orange (61–80%), red (81–100%).
+
 ## Application Structure
 
 ### Module Layout
 
 ```
 src/
-├── lib.rs                # library crate root, re-exports cpu, gpu, memory, and ui modules
+├── lib.rs                # library crate root, re-exports cpu, disk, gpu, memory, and ui modules
 ├── main.rs               # binary entry point, terminal init, event loop
 ├── cpu/
 │   ├── mod.rs            # re-exports CpuState, CpuTimes, TempState
 │   ├── utilization.rs    # /proc/stat parsing, per-core usage history
 │   └── temperature.rs    # hwmon discovery, sysfs temp reading, history
+├── disk/
+│   ├── mod.rs            # re-exports DiskSpaceState, DiskIoState, MountEntry, DiskIoEntry
+│   ├── space.rs          # /proc/mounts parsing, statvfs reading, per-filesystem usage history
+│   └── io.rs             # /proc/diskstats parsing, delta I/O computation, per-device R/W history
 ├── gpu/
 │   ├── mod.rs            # GpuState, GpuBackend enum, vendor detection dispatch
 │   ├── nvidia.rs         # NVIDIA detection and reading via nvidia-smi
@@ -169,6 +206,7 @@ src/
     ├── colors.rs         # ANSI color constants, sparkline helpers, color selectors
     ├── layout.rs         # pure layout-math functions (column widths, core distribution)
     ├── cpu.rs            # CPU utilization/temperature row rendering
+    ├── disk.rs           # Disk space/I/O row rendering
     ├── memory.rs         # Memory (RAM/swap) row rendering
     └── gpu.rs            # GPU utilization/memory/temperature row rendering
 
@@ -177,6 +215,10 @@ tests/
 ├── cpu/
 │   ├── temperature.rs    # temperature module tests
 │   └── utilization.rs    # CPU utilization module tests
+├── disk.rs               # crate root, declares space + io submodules
+├── disk/
+│   ├── space.rs          # disk space parsing and DiskSpaceState tests
+│   └── io.rs             # diskstats parsing, DiskIoState, format_rate, sparkline_char_scaled tests
 ├── gpu.rs                # crate root, declares state + nvidia + amd submodules
 ├── gpu/
 │   ├── state.rs          # GpuState lifecycle and integration tests
@@ -186,12 +228,13 @@ tests/
 ├── memory/
 │   ├── temperature.rs    # DIMM temperature module tests
 │   └── usage.rs          # memory usage module tests
-├── ui.rs                 # crate root, declares colors + layout + render + cpu + memory + gpu submodules
+├── ui.rs                 # crate root, declares colors + layout + render + cpu + memory + gpu + disk submodules
 └── ui/
     ├── colors.rs          # sparkline character + color function tests
     ├── layout.rs          # layout math tests (label widths, column splits, chart widths)
     ├── render.rs          # render_frame integration tests
     ├── cpu.rs             # CPU row rendering tests
+    ├── disk.rs            # Disk row rendering tests
     ├── memory.rs          # memory row rendering tests
     └── gpu.rs             # GPU row rendering tests
 ```
@@ -207,6 +250,8 @@ discover CPU temperature sensors via hwmon (k10temp/coretemp)
 take initial /proc/meminfo snapshot
 discover DIMM temperature sensors via hwmon (jc42)
 detect GPU vendor (NVIDIA via nvidia-smi, AMD via /sys/class/drm/)
+discover real filesystems via /proc/mounts (filter virtual, verify statvfs)
+take initial /proc/diskstats snapshot (baseline for I/O delta computation)
 
 loop every 1 second:
     poll for key events (non-blocking)
@@ -217,6 +262,8 @@ loop every 1 second:
     read /proc/meminfo → compute RAM and swap usage percentages
     read hwmon jc42 tempN_input → current DIMM temperatures
     read GPU metrics (nvidia-smi or sysfs) → utilization, memory, temperature
+    read statvfs per filesystem → disk space used/total
+    read /proc/diskstats → compute per-device I/O deltas (bytes/sec)
     push new values into history buffers
 
     calculate layout dimensions (left/right halves from terminal size)
@@ -286,6 +333,34 @@ struct GpuState {
     current_mem_used_kb: u64,          // for absolute memory display
     current_mem_total_kb: u64,
 }
+
+struct MountEntry {
+    device: String,                    // e.g. "/dev/sda1"
+    mount_point: String,               // e.g. "/", "/home"
+    fs_type: String,                   // e.g. "ext4", "btrfs"
+}
+
+struct DiskSpaceState {
+    mounts: Vec<MountEntry>,           // discovered real filesystems
+    histories: Vec<VecDeque<f64>>,     // usage % per filesystem
+    current_used_kb: Vec<u64>,         // for absolute display
+    current_total_kb: Vec<u64>,
+}
+
+struct DiskIoEntry {
+    device: String,                    // e.g. "sda", "nvme0n1"
+    read_sectors: u64,                 // cumulative sectors read
+    write_sectors: u64,                // cumulative sectors written
+}
+
+struct DiskIoState {
+    devices: Vec<String>,              // ordered device names
+    prev_read_sectors: Vec<u64>,       // previous tick's counters
+    prev_write_sectors: Vec<u64>,
+    read_histories: Vec<VecDeque<f64>>,  // bytes/sec per device (read)
+    write_histories: Vec<VecDeque<f64>>, // bytes/sec per device (write)
+    max_observed: Vec<f64>,            // per-device max for auto-scaling
+}
 ```
 
 The `VecDeque` acts as a ring buffer. When a new sample is pushed and the buffer exceeds the current chart width, the oldest sample is popped from the front.
@@ -293,9 +368,9 @@ The `VecDeque` acts as a ring buffer. When a new sample is pushed and the buffer
 ### Rendering Pipeline
 
 1. **Query terminal size** — get current column and row count
-2. **Calculate layout** — CPU: split into three columns (two utilization columns at 2/3 width, one temperature column at 1/3 width); Memory: split into three equal columns (RAM utilization, swap utilization, DIMM temperature); determine chart widths by subtracting fixed elements (labels, padding, borders, temp display) from column widths
+2. **Calculate layout** — CPU: split into three columns (two utilization columns at 2/3 width, one temperature column at 1/3 width); Memory: split into three equal columns (RAM utilization, swap utilization, DIMM temperature); Disk: side-by-side split (2/3 space, 1/3 I/O); determine chart widths by subtracting fixed elements (labels, padding, borders, temp/rate display) from column widths
 3. **Resize buffers** — if terminal width changed, grow or shrink history buffers
-4. **Build frame** — CPU: split threads in half, render utilization in columns 1–2 and temperature in column 3; Memory: render RAM in column 1, swap in column 2, DIMM temperature in column 3; top-align all columns
+4. **Build frame** — CPU: split threads in half, render utilization in columns 1–2 and temperature in column 3; Memory: render RAM in column 1, swap in column 2, DIMM temperature in column 3; Disk: render space usage in left half, I/O read/write in right half; top-align all columns within each section
 5. **Output frame** — move cursor to top-left, write the complete frame buffer to stdout in a single flush
 
 The frame is composed in a `String` buffer before writing to minimize flickering. Cursor positioning uses ANSI escape codes (`\x1b[H` to home, `\x1b[K` to clear line remainders).

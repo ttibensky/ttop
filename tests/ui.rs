@@ -15,3 +15,6 @@ mod memory;
 
 #[path = "ui/gpu.rs"]
 mod gpu;
+
+#[path = "ui/disk.rs"]
+mod disk;

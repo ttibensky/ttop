@@ -1,5 +1,6 @@
 use ttop::cpu::temperature::TempState;
 use ttop::cpu::utilization::CpuState;
+use ttop::disk::{DiskIoState, DiskSpaceState};
 use ttop::gpu::GpuState;
 use ttop::memory::{MemState, MemTempState};
 use ttop::ui::render_frame;
@@ -11,7 +12,9 @@ fn render_frame_contains_cpu_section() {
     let mem = MemState::new();
     let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 40);
+    let disk_space = DiskSpaceState::new();
+    let disk_io = DiskIoState::new();
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, &disk_space, &disk_io, 120, 40);
     let stripped = strip_ansi(&frame);
     assert!(stripped.contains("CPU"), "frame should contain CPU header");
 }
@@ -23,7 +26,9 @@ fn render_frame_contains_subtitles() {
     let mem = MemState::new();
     let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 40);
+    let disk_space = DiskSpaceState::new();
+    let disk_io = DiskIoState::new();
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, &disk_space, &disk_io, 120, 40);
     let stripped = strip_ansi(&frame);
     assert!(
         stripped.contains("Utilization"),
@@ -42,7 +47,9 @@ fn render_frame_contains_status_bar() {
     let mem = MemState::new();
     let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 40);
+    let disk_space = DiskSpaceState::new();
+    let disk_io = DiskIoState::new();
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, &disk_space, &disk_io, 120, 40);
     let stripped = strip_ansi(&frame);
     assert!(stripped.contains("q: quit"));
     assert!(stripped.contains("ttop v0.1"));
@@ -55,7 +62,9 @@ fn render_frame_contains_all_core_labels() {
     let mem = MemState::new();
     let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 60);
+    let disk_space = DiskSpaceState::new();
+    let disk_io = DiskIoState::new();
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, &disk_space, &disk_io, 120, 60);
     let stripped = strip_ansi(&frame);
     for i in 0..cpu.core_count() {
         assert!(
@@ -73,7 +82,9 @@ fn render_frame_has_box_drawing_chars() {
     let mem = MemState::new();
     let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 40);
+    let disk_space = DiskSpaceState::new();
+    let disk_io = DiskIoState::new();
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, &disk_space, &disk_io, 120, 40);
     let stripped = strip_ansi(&frame);
     assert!(stripped.contains('╭'));
     assert!(stripped.contains('╮'));
@@ -88,7 +99,9 @@ fn render_frame_contains_vertical_separator() {
     let mem = MemState::new();
     let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 40);
+    let disk_space = DiskSpaceState::new();
+    let disk_io = DiskIoState::new();
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, &disk_space, &disk_io, 120, 40);
     let stripped = strip_ansi(&frame);
     let lines: Vec<&str> = stripped.lines().collect();
     if lines.len() > 2 {
@@ -108,7 +121,9 @@ fn render_frame_shows_temp_or_na() {
     let mem = MemState::new();
     let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 40);
+    let disk_space = DiskSpaceState::new();
+    let disk_io = DiskIoState::new();
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, &disk_space, &disk_io, 120, 40);
     let stripped = strip_ansi(&frame);
     let has_temp = stripped.contains("°C") && stripped.contains("°F");
     let has_na = stripped.contains("N/A");
@@ -122,7 +137,9 @@ fn render_frame_contains_memory_section() {
     let mem = MemState::new();
     let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 60);
+    let disk_space = DiskSpaceState::new();
+    let disk_io = DiskIoState::new();
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, &disk_space, &disk_io, 120, 60);
     let stripped = strip_ansi(&frame);
     assert!(stripped.contains("Memory"), "frame should contain Memory header");
 }
@@ -134,7 +151,9 @@ fn render_frame_contains_ram_and_swp_labels() {
     let mem = MemState::new();
     let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 60);
+    let disk_space = DiskSpaceState::new();
+    let disk_io = DiskIoState::new();
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, &disk_space, &disk_io, 120, 60);
     let stripped = strip_ansi(&frame);
     assert!(stripped.contains("RAM"), "frame should contain RAM label");
     assert!(stripped.contains("SWP"), "frame should contain SWP label");
@@ -147,7 +166,9 @@ fn render_frame_memory_has_three_column_subtitles() {
     let mem = MemState::new();
     let mem_temp = MemTempState::new();
     let gpu = GpuState::new();
-    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, 120, 60);
+    let disk_space = DiskSpaceState::new();
+    let disk_io = DiskIoState::new();
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, &disk_space, &disk_io, 120, 60);
     let stripped = strip_ansi(&frame);
     assert!(
         stripped.contains("RAM Utilization"),
@@ -157,6 +178,22 @@ fn render_frame_memory_has_three_column_subtitles() {
         stripped.contains("Swap Utilization"),
         "frame should contain 'Swap Utilization' subtitle"
     );
+}
+
+#[test]
+fn render_frame_contains_disk_section() {
+    let cpu = CpuState::new();
+    let temp = TempState::new();
+    let mem = MemState::new();
+    let mem_temp = MemTempState::new();
+    let gpu = GpuState::new();
+    let disk_space = DiskSpaceState::new();
+    let disk_io = DiskIoState::new();
+    let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, &disk_space, &disk_io, 120, 80);
+    let stripped = strip_ansi(&frame);
+    assert!(stripped.contains("Disk"), "frame should contain Disk header");
+    assert!(stripped.contains("Space"), "frame should contain Space subtitle");
+    assert!(stripped.contains("I/O"), "frame should contain I/O subtitle");
 }
 
 fn strip_ansi(s: &str) -> String {
