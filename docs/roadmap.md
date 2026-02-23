@@ -130,7 +130,7 @@ Publish ttop as a PPA so users can install it with `sudo apt install ttop`.
    - GPG signing key stored as GitHub Actions secret
 4. **README update** — add `apt install` instructions to the Installation section
 
-## Phase 8: Performance Benchmarks
+## Phase 8: Performance Benchmarks ✓
 
 Run a resource-usage comparison of `ttop` vs `top` vs `htop` and publish the results in the README.
 

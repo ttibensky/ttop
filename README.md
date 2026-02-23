@@ -26,6 +26,25 @@ ttop is a lightweight alternative to `top` and `htop` focused on displaying real
 - **Readable at a glance** — color-coded sparkline charts make it easy to spot load patterns and danger zones without reading numbers.
 - **Full-screen** — uses the alternate screen buffer like htop, restoring the terminal cleanly on exit.
 
+## Performance
+
+ttop is designed to be lightweight. It reads a small set of specific kernel files (`/proc/stat`, `/proc/meminfo`, `/sys/class/hwmon/`, etc.) once per second, whereas top and htop enumerate and sort the entire process table on every refresh. This is not an apples-to-apples comparison — top and htop do more work because they provide per-process detail that ttop does not. That said, most of the time when you reach for a system monitor you just want to know how your CPU, memory, and disks are doing, not scroll through a process list. For that use case, ttop gets the job done at a fraction of the cost.
+
+Measured over 60-second runs with 1-second refresh on an AMD Ryzen 7 7840HS (16 cores, 32 GiB RAM, Ubuntu 25.10):
+
+| Tool | Avg CPU (%) | Avg Memory (MB) |
+|------|-------------|-----------------|
+| ttop | 0.14 | 3.1 |
+| top  | 1.25 | 5.9 |
+| htop | 8.68 | 7.8 |
+
+| Metric | ttop vs top | ttop vs htop |
+|--------|-------------|--------------|
+| CPU    | -88.8% | -98.3% |
+| Memory | -47.8% | -60.0% |
+
+For full methodology and reproduction steps, see [docs/performance-comparison.md](docs/performance-comparison.md).
+
 ## Target Platform
 
 - Ubuntu 25.10 (Linux kernel 6.x+)
