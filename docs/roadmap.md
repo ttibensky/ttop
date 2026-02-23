@@ -114,6 +114,19 @@ Publish ttop as a PPA so users can install it with `sudo apt install ttop`.
    - GPG signing key stored as GitHub Actions secret
 4. **README update** — add `apt install` instructions to the Installation section
 
+## Phase 8: Performance Benchmarks
+
+Run a resource-usage comparison of `ttop` vs `top` vs `htop` and publish the results in the README.
+
+### Deliverables
+
+1. **Benchmark harness** — script that launches each tool under identical conditions and collects CPU usage, RSS memory, and startup time
+2. **Sampling methodology** — run each tool for a fixed duration (e.g., 60 seconds), sample `/proc/<pid>/stat` and `/proc/<pid>/status` at regular intervals
+3. **Metrics collected** — average CPU %, peak RSS (kB), startup-to-first-render latency
+4. **Environment normalization** — document system specs (CPU, RAM, kernel version), ensure idle baseline, pin refresh rates to 1 second across all three tools
+5. **Results table in README** — add a "Performance" section with a comparison table (tool, avg CPU %, peak RSS, startup time) and a brief interpretation
+6. **Reproducibility instructions** — include the benchmark script and usage instructions so others can replicate the results on their own hardware
+
 ## Design Decisions Log
 
 | Decision | Choice | Rationale |
