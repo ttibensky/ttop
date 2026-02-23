@@ -2,7 +2,9 @@
 
 ## Overview
 
-ttop is a single-binary Rust application that reads system metrics from Linux kernel interfaces, maintains a rolling history buffer, and renders a full-screen TUI using ANSI escape codes via the `crossterm` crate.
+ttop is a Rust application structured as a **library + binary** crate. The library (`src/lib.rs`) exposes all core logic — data collection, history management, and rendering — while the binary (`src/main.rs`) handles terminal setup and the event loop. This split allows all tests to live as external integration tests in `tests/`, importing the public API via `use ttop::...`.
+
+The application reads system metrics from Linux kernel interfaces, maintains a rolling history buffer, and renders a full-screen TUI using ANSI escape codes via the `crossterm` crate.
 
 ## Dependencies
 
@@ -105,13 +107,21 @@ SwapFree:        7700000 kB
 
 ```
 src/
-├── main.rs               # entry point, terminal init, event loop
+├── lib.rs                # library crate root, re-exports cpu and ui modules
+├── main.rs               # binary entry point, terminal init, event loop
 ├── cpu/
-│   ├── mod.rs            # re-exports CpuState, TempState
+│   ├── mod.rs            # re-exports CpuState, CpuTimes, TempState
 │   ├── utilization.rs    # /proc/stat parsing, per-core usage history
 │   └── temperature.rs    # hwmon discovery, sysfs temp reading, history
 └── ui.rs                 # rendering: layout, sparklines, colors, frame composition
+
+tests/
+├── cpu_temperature.rs    # temperature module tests
+├── cpu_utilization.rs    # CPU utilization module tests
+└── ui.rs                 # UI rendering tests
 ```
+
+All tests are external integration tests that import from the `ttop` library crate. Test files mirror the source module they cover.
 
 ### Main Loop
 

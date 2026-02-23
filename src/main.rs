@@ -1,6 +1,3 @@
-mod cpu;
-mod ui;
-
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
@@ -11,8 +8,8 @@ use crossterm::{
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
 };
 
-use cpu::{CpuState, TempState};
-use ui::{label_width, left_chart_width, render_frame, right_chart_width, temp_label_width};
+use ttop::cpu::{CpuState, TempState};
+use ttop::ui::{label_width, left_chart_width, render_frame, right_chart_width, temp_label_width};
 
 const TICK_INTERVAL: Duration = Duration::from_secs(1);
 

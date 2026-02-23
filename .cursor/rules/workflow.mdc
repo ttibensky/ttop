@@ -29,27 +29,29 @@ If the request is clear, narrowly scoped, and low-impact, skip this step and pro
 
 ## After Code Changes
 
-Before reporting that a task is complete, always run:
+Before reporting that a task is complete, run through this checklist:
+
+1. **Tests** — add or update tests for every new feature, bug fix, or behavioral change.
+2. **Docs** — update documentation if the change affects any of these:
+   - `docs/architecture.md` — new modules, crate structure, data flow, data sources.
+   - `docs/ui-design.md` — UI layout, rendering behavior, color schemes.
+   - `docs/roadmap.md` — mark completed items, add new scope.
+   - `README.md` — user-facing features, new dependencies, build/run instructions.
+3. **Lint & test** — both must pass with zero warnings and zero failures:
 
 ```bash
 cargo clippy --tests
 cargo test
 ```
 
-Both must pass with zero warnings and zero failures. Fix any issues before finishing.
+Fix any issues before finishing.
 
 ## Tests
 
-- Add or update tests for every new feature, bug fix, or behavioral change.
-- Unit tests go in `#[cfg(test)] mod tests { ... }` blocks inside the source file they test.
-- Integration tests go in `tests/*.rs` files.
+- All tests live in the `tests/` directory as integration tests, **not** inline in source files.
+- Name test files to mirror the module they cover (e.g., `tests/cpu_utilization.rs` for `src/cpu/utilization.rs`).
+- Items that need testing must be `pub` so integration tests can reach them.
 - Aim for coverage of edge cases, boundary values, and error conditions — not just the happy path.
-
-## Documentation
-
-- Update `README.md` when adding user-facing features, new dependencies, or changes to build/run instructions.
-- Update files in `docs/` (architecture, UI design, roadmap) when making architectural changes, adding new data sources, or changing the UI layout/behavior.
-- Keep the roadmap phases current — mark completed items and add new ones as scope evolves.
 
 ## Continuous Rule Improvement
 
