@@ -33,11 +33,16 @@ Side-by-side layout: utilization sparklines on the left half, temperature sparkl
 10. **N/A fallback** — `N/A°C (N/A°F)` with dim styling when no sensors found
 11. **Top-aligned rows** — temperature rows top-aligned on right; empty space below if fewer sensors than cores
 
-## Phase 3: Memory
+## Phase 3: Memory (RAM + Swap)
 
-- Parse `/proc/meminfo` for RAM and swap
-- Add the Memory section box with two sparkline rows (RAM, SWP)
-- Show absolute values alongside percentages (e.g., `5.6/16G`)
+- Parse `/proc/meminfo` for `MemTotal`, `MemAvailable`, `SwapTotal`, `SwapFree`
+- New `src/memory/` module with `MemState` struct (rolling history per metric)
+- RAM usage: `(MemTotal - MemAvailable) / MemTotal * 100`
+- Swap usage: `(SwapTotal - SwapFree) / SwapTotal * 100`
+- Full-width "Memory" section box with two sparkline rows (RAM, SWP)
+- Show absolute values alongside percentages (e.g., `5.6/16.0G  35%`)
+- Reuse existing `utilization_color()` and `sparkline_char()` for coloring
+- Graceful handling when swap is disabled (swap_total == 0)
 
 ## Phase 4: GPU
 
@@ -47,7 +52,25 @@ Side-by-side layout: utilization sparklines on the left half, temperature sparkl
 - Add the GPU section box with utilization, memory, and temperature sparklines
 - GPU name displayed in the section title
 
-## Phase 5: Polish
+## Phase 5: Disk (Space + I/O)
+
+- New `src/disk/` module with `DiskSpaceState` and `DiskIoState` structs
+- **Space usage** (left half):
+  - Parse `/proc/mounts` to discover real filesystems (filter out `tmpfs`, `sysfs`, `proc`, etc.)
+  - Call `libc::statvfs` on each mount point for used/total bytes
+  - One sparkline row per filesystem, labeled by mount point (e.g., `/`, `/home`)
+  - Display: `used/totalG  NN%`
+- **I/O throughput** (right half):
+  - Parse `/proc/diskstats` for cumulative sector read/write counters
+  - Delta computation between ticks to derive bytes/sec per device (sector = 512 bytes)
+  - Filter to whole-disk devices (exclude partitions like `sda1`)
+  - Separate R (read) and W (write) sparkline rows per device
+  - Auto-scaling sparklines (0 to max observed value) via new `sparkline_char_scaled()` helper
+  - Display: human-readable rate with adaptive unit (`KB/s`, `MB/s`, `GB/s`)
+- Side-by-side "Disk" section box (same layout pattern as CPU)
+- Add `libc` as direct dependency (already a transitive dep of `crossterm`, zero cost)
+
+## Phase 6: Polish
 
 - Graceful handling of missing hardware (no GPU, no temp sensors)
 - Error resilience (permission denied, file not found, malformed data)
@@ -60,7 +83,7 @@ Side-by-side layout: utilization sparklines on the left half, temperature sparkl
 |----------|--------|-----------|
 | Language | Rust | Performance, safety, single binary distribution |
 | Terminal library | `crossterm` | Minimal, cross-platform terminal control without a full TUI framework |
-| Data source | `/proc/stat`, `/sys/class/hwmon/`, `/proc/meminfo` | Direct kernel interfaces, zero runtime dependencies |
+| Data source | `/proc/stat`, `/sys/class/hwmon/`, `/proc/meminfo`, `/proc/mounts`, `statvfs`, `/proc/diskstats` | Direct kernel interfaces, zero runtime dependencies |
 | Chart type | Single-row sparklines (`▁▂▃▄▅▆▇█`) | Compact enough to show all cores on one screen, 8 levels of vertical resolution per row |
 | Chart width | Dynamic (fills terminal width) | Wider terminals show more history; adapts on resize |
 | Color scheme | Green → Yellow → Orange → Red | Intuitive severity gradient, readable on dark backgrounds |
