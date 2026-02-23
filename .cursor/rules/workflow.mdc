@@ -1,9 +1,31 @@
 ---
-description: Project workflow — testing, linting, docs updates after code changes
+description: Project workflow — clarification, testing, linting, docs updates
 alwaysApply: true
 ---
 
 # Workflow
+
+## Before Starting Work
+
+Before writing any code, evaluate whether the user's prompt needs clarification. **Ask questions first** when any of the following apply:
+
+- **Vague or ambiguous request** — the prompt can be interpreted in more than one way.
+- **Multiple valid approaches** — there are different implementation strategies with meaningfully different trade-offs (performance, complexity, maintainability).
+- **Significant project implications**, such as:
+  - Introducing a new dependency or library.
+  - Requiring a refactoring of existing code beyond the immediate task.
+  - Touching many files or adding a large amount of new code.
+  - Changing public APIs, data models, or architectural patterns.
+
+When asking for clarification:
+
+1. Present the options or trade-offs concisely — keep it scannable, not wall-of-text.
+2. Ask as many questions as needed to fully understand the user's intent — do not artificially limit yourself to a small number.
+3. Wait for the user's answers before proceeding.
+4. After receiving answers, evaluate whether follow-up questions are needed. Ask additional rounds of questions if the answers reveal new ambiguities, trade-offs, or implications that meet the criteria above. Repeat until the path forward is clear.
+5. Never start implementation while open questions remain.
+
+If the request is clear, narrowly scoped, and low-impact, skip this step and proceed directly.
 
 ## After Code Changes
 
@@ -28,3 +50,22 @@ Both must pass with zero warnings and zero failures. Fix any issues before finis
 - Update `README.md` when adding user-facing features, new dependencies, or changes to build/run instructions.
 - Update files in `docs/` (architecture, UI design, roadmap) when making architectural changes, adding new data sources, or changing the UI layout/behavior.
 - Keep the roadmap phases current — mark completed items and add new ones as scope evolves.
+
+## Continuous Rule Improvement
+
+After completing a task — especially one where the user gave feedback, corrected a plan, or pushed back on an implementation choice — reflect on whether any cursor rules should be updated or created. Review **all** existing rules in `.cursor/rules/` (recursively, including subdirectories) to find the best place for the change, or determine that a new rule file is needed. Consider this whenever:
+
+- The user corrected a **coding style, naming convention, or structural preference** that isn't captured in existing rules.
+- The user rejected an **architectural approach** or **design pattern** in favor of a different one.
+- A **recurring friction point** appeared (e.g., the user had to remind you of something more than once).
+- The user expressed a **general preference** (e.g., "I always want X" / "never do Y") that would apply to future tasks.
+- You made an **assumption** that turned out to be wrong — and a rule could prevent that in the future.
+
+When you identify an improvement:
+
+1. Present each proposed rule change as a **concrete option** the user can accept, reject, or modify.
+   - If there are multiple reasonable wordings or approaches, present them as **numbered alternatives** and let the user pick.
+   - Show the exact text that would be added or changed — not just a summary.
+2. Wait for the user's choice before modifying or creating any rule file.
+3. If approved, update the relevant `.cursor/rules/*.mdc` file or create a new one using the `create-rule` skill.
+4. Keep rules concise, actionable, and non-redundant with existing rules.

@@ -53,17 +53,34 @@ Each `cpuN` line contains these fields (in "jiffies" / clock ticks):
 
 The number of `cpuN` lines is detected dynamically — works for any core count.
 
-### CPU Temperature — `/sys/class/hwmon/` (future)
+### CPU Temperature — `/sys/class/hwmon/`
 
 Thermal data is exposed via the hardware monitoring subsystem:
 
 ```
 /sys/class/hwmon/hwmonN/temp1_input   # temperature in millidegrees Celsius
-/sys/class/hwmon/hwmonN/temp1_label   # sensor label (e.g., "Core 0")
-/sys/class/hwmon/hwmonN/name          # driver name (e.g., "coretemp")
+/sys/class/hwmon/hwmonN/temp1_label   # sensor label (e.g., "Core 0", "Tctl")
+/sys/class/hwmon/hwmonN/name          # driver name (e.g., "coretemp", "k10temp")
 ```
 
-The correct hwmon device is identified by finding the one with `name == "coretemp"` (Intel) or `name == "k10temp"` (AMD). Individual core temperatures are then read from `tempN_input` files.
+**Discovery algorithm:**
+
+1. Iterate over `/sys/class/hwmon/hwmon*/`
+2. Read the `name` file in each directory
+3. Match on `k10temp` (AMD) or `coretemp` (Intel)
+4. For the matched device, enumerate all `tempN_input` / `tempN_label` file pairs
+5. Store the paths for repeated reading each tick
+
+**AMD vs Intel differences:**
+
+- **AMD (`k10temp`):** exposes a single package temperature sensor labeled `Tctl`. Per-core temperatures are not available. The right half of the CPU section shows one temperature row.
+- **Intel (`coretemp`):** exposes per-core temperature sensors labeled `Core 0`, `Core 1`, etc. The right half shows one row per physical core.
+
+Temperature values in sysfs are in millidegrees Celsius (e.g., `46375` = 46.375°C). Displayed in both Celsius and Fahrenheit: `46°C (115°F)`.
+
+**Graceful degradation:** when no matching hwmon device is found (VMs, containers, unsupported hardware), the temperature column displays `N/A°C (N/A°F)` with dim styling.
+
+**Integrated GPUs:** even on AMD APUs where the GPU is on the same die, Linux exposes CPU and GPU temperatures as separate hwmon devices (`k10temp` for CPU, `amdgpu` for GPU). They are handled by different modules: `src/cpu/temperature.rs` and future `src/gpu/temperature.rs`.
 
 ### Memory — `/proc/meminfo` (future)
 
@@ -84,22 +101,34 @@ SwapFree:        7700000 kB
 
 ## Application Structure
 
+### Module Layout
+
+```
+src/
+├── main.rs               # entry point, terminal init, event loop
+├── cpu/
+│   ├── mod.rs            # re-exports CpuState, TempState
+│   ├── utilization.rs    # /proc/stat parsing, per-core usage history
+│   └── temperature.rs    # hwmon discovery, sysfs temp reading, history
+└── ui.rs                 # rendering: layout, sparklines, colors, frame composition
+```
+
 ### Main Loop
 
 ```
 initialize terminal (alternate screen, raw mode, hide cursor)
 take initial /proc/stat snapshot
+discover temperature sensors via hwmon
 
 loop every 1 second:
     poll for key events (non-blocking)
         if 'q' or Ctrl+C → break
 
-    read /proc/stat
-    compute per-core deltas from previous snapshot
+    read /proc/stat → compute per-core utilization deltas
+    read hwmon tempN_input → current temperatures
     push new values into history buffers
-    store current snapshot for next iteration
 
-    calculate layout dimensions from terminal size
+    calculate layout dimensions (left/right halves from terminal size)
     render all sections to a string buffer
     flush buffer to terminal
 
@@ -109,24 +138,23 @@ restore terminal (show cursor, disable raw mode, leave alternate screen)
 ### Data Model
 
 ```
-struct CoreHistory {
-    samples: VecDeque<f64>,   // rolling buffer, max size = chart width
+struct CpuTimes {
+    user, nice, system, idle, iowait, irq, softirq, steal: u64,
 }
 
 struct CpuState {
-    prev_snapshot: Vec<CpuTimes>,    // previous /proc/stat reading
-    histories: Vec<CoreHistory>,      // one per logical processor
+    prev_snapshot: Vec<CpuTimes>,
+    histories: Vec<VecDeque<f64>>,     // one per logical processor
 }
 
-struct CpuTimes {
-    user: u64,
-    nice: u64,
-    system: u64,
-    idle: u64,
-    iowait: u64,
-    irq: u64,
-    softirq: u64,
-    steal: u64,
+struct TempSensor {
+    input_path: PathBuf,               // e.g. /sys/class/hwmon/hwmon3/temp1_input
+    label: String,                     // e.g. "Tctl", "Core 0"
+}
+
+struct TempState {
+    sensors: Vec<TempSensor>,
+    histories: Vec<VecDeque<f64>>,     // one per sensor, values in °C
 }
 ```
 
@@ -135,38 +163,63 @@ The `VecDeque` acts as a ring buffer. When a new sample is pushed and the buffer
 ### Rendering Pipeline
 
 1. **Query terminal size** — get current column and row count
-2. **Calculate layout** — determine chart width by subtracting fixed elements (labels, padding, borders) from terminal width
+2. **Calculate layout** — split terminal into left half (utilization) and right half (temperature), determine chart widths for each by subtracting fixed elements (labels, padding, borders, temp display) from half-widths
 3. **Resize buffers** — if terminal width changed, grow or shrink history buffers
-4. **Build frame** — iterate over each section and row, converting data points to colored sparkline characters
+4. **Build frame** — iterate over each row; render utilization sparkline on the left, vertical separator, and temperature sparkline on the right; top-align temperature rows (fill remaining right-half rows with empty space)
 5. **Output frame** — move cursor to top-left, write the complete frame buffer to stdout in a single flush
 
 The frame is composed in a `String` buffer before writing to minimize flickering. Cursor positioning uses ANSI escape codes (`\x1b[H` to home, `\x1b[K` to clear line remainders).
 
+### Side-by-Side Layout
+
+```
+╭─ CPU ───────────────────────────────────────────────────────────────────────╮
+│                                    │                                       │
+│  0 ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂  3% │ Tctl ▁▁▁▁▁▁▁▁▁▁▁▁▁▃  46°C (115°F)  │
+│  1 ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁  0% │                                       │
+│  2 ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁  1% │                                       │
+│  ...                              │                                       │
+│                                    │                                       │
+╰─────────────────────────────────────────────────────────────────────────────╯
+```
+
+The left and right halves are separated by a thin `│` vertical separator. Temperature rows are top-aligned: if there are fewer sensors than CPU cores, the remaining right-half rows are blank. If no sensors are found, a single `N/A°C (N/A°F)` row appears.
+
 ### Color Selection
 
-A simple function maps a percentage value to an ANSI color code:
+**Utilization colors** (by percentage):
 
-```
-fn utilization_color(pct: f64) -> &str {
-    match pct {
-        0.0..=25.0   => "\x1b[32m",          // green
-        25.0..=50.0  => "\x1b[33m",          // yellow
-        50.0..=75.0  => "\x1b[38;5;208m",    // orange (256-color)
-        _            => "\x1b[31m",          // red
-    }
-}
-```
+| Range | Color |
+|-------|-------|
+| 0–25% | Green |
+| 26–50% | Yellow |
+| 51–75% | Orange (256-color) |
+| 76–100% | Red |
+
+**Temperature colors** (by °C):
+
+| Range | Color |
+|-------|-------|
+| 0–49°C | Green |
+| 50–69°C | Yellow |
+| 70–84°C | Orange (256-color) |
+| 85°C+ | Red |
 
 ### Sparkline Character Selection
 
-A percentage is mapped to one of 8 Unicode block elements:
+Utilization maps 0–100% to one of 8 Unicode block elements. Temperature maps 30–100°C to the same 8 characters:
 
 ```
-fn sparkline_char(pct: f64) -> char {
-    const CHARS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-    let index = ((pct / 100.0) * 7.0).round() as usize;
-    CHARS[index.min(7)]
-}
+const SPARKLINE_CHARS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 ```
 
 Each character is wrapped with its own color code, so adjacent characters in the same sparkline can have different colors.
+
+### Temperature Display Format
+
+Each temperature sensor shows the current value in both Celsius and Fahrenheit:
+
+```
+46°C (115°F)     — normal sensor reading
+N/A°C (N/A°F)   — sensor unavailable (dim styling)
+```

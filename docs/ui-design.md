@@ -6,53 +6,56 @@ ttop renders a full-screen interface using the terminal's alternate screen buffe
 
 ## Screen Layout
 
+The CPU section uses a **side-by-side layout**: utilization sparklines on the left half, temperature sparklines on the right half, separated by a vertical `│` border.
+
 ```
-╭─ CPU ──────────────────────────────────────────────────────────────────────────╮
-│                                                                                │
-│   0 ▁▁▂▂▃▃▄▃▂▁▁▂▃▄▅▆▅▄▃▂▂▃▄▅▅▆▅▄▃▃▄▅▆▆▅▄▃▂▃▄▅▆▅▄▃▃▄▅▅▆▆▅▅▆▅▅  52% │
-│   1 ▁▁▁▁▁▂▂▂▃▂▂▁▁▁▁▂▂▃▂▁▁▁▁▂▂▂▃▂▁▁▁▁▂▂▃▂▁▁▁▁▁▂▂▃▂▁▁▂▂▂▃▂▂▂▂  20% │
-│   2 ▆▇▇█▇▇▆▇████▇▇█████▇▆▇▇████▇▇█████▇▆▇████▇▇████▇▆▇██████  93% │
-│   3 ▃▄▅▅▆▅▅▄▃▃▄▅▆▆▅▅▄▃▃▄▅▅▆▆▅▄▃▃▄▅▆▆▅▅▄▃▃▄▅▅▆▅▅▄▅▅▆▅▅▆▅▅▆▅  61% │
-│   4 ▁▁▁▁▂▁▁▁▁▁▁▂▁▁▁▁▁▁▁▂▂▁▁▁▁▁▁▂▁▁▁▁▁▁▂▂▁▁▁▁▁▁▁▂▁▁▁▁▁▁▂▂▁▂  15% │
-│   5 ▂▂▃▃▃▂▂▂▃▃▃▄▃▃▂▂▃▃▃▂▂▃▃▃▄▃▃▂▂▂▃▃▃▂▂▃▃▃▄▃▃▂▂▂▃▃▃▃▃▃▃▃▃▃  30% │
-│   6 ▅▆▆▇▇██▇▆▅▅▆▇▇██▇▆▅▆▆▇▇██▇▆▅▅▆▇██▇▇▆▅▆▇▇██▇▆▅▆▇██▇▇██  85% │
-│   7 ▂▃▃▄▄▃▃▂▂▃▃▄▄▃▃▂▃▃▄▄▃▃▂▂▃▃▄▃▃▂▃▃▄▄▃▃▂▂▃▃▄▃▃▂▃▃▄▄▃▃▄▃▄  42% │
-│   8 ▁▁▁▁▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▁▁▂▁▁▁   5% │
-│   9 ▄▅▅▆▆▇▆▆▅▄▅▅▆▇▇▆▆▅▄▅▆▆▇▇▆▅▅▆▆▇▆▆▅▄▅▅▆▇▇▆▆▅▅▆▆▇▇▆▅▆▇▆  78% │
-│  10 ▂▃▃▃▂▂▃▃▃▃▃▂▂▂▃▃▃▂▂▃▃▃▃▃▂▂▂▃▃▃▂▂▃▃▃▃▃▂▂▂▃▃▃▂▃▃▃▃▃▃▃▃▃  35% │
-│  11 ▃▄▅▅▆▅▅▄▃▄▅▅▆▆▅▅▄▃▄▅▅▆▅▅▄▃▄▅▅▆▆▅▄▃▄▅▅▆▅▅▄▃▄▅▅▆▆▅▅▆▅▆  68% │
-│  12 ▇██████▇███████████▇████████▇██████████████████▇█████████ 100% │
-│  13 ▁▁▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁  10% │
-│  14 ▂▃▃▄▃▃▂▂▃▃▄▄▃▃▂▃▃▄▃▃▂▂▃▃▄▄▃▃▂▃▃▄▃▃▂▃▃▄▄▃▃▂▃▃▄▃▃▄▃▄▄▃  45% │
-│  15 ▃▄▅▅▅▅▄▃▃▄▅▅▅▅▅▄▃▃▄▅▅▅▅▄▃▃▄▅▅▅▅▅▄▃▃▄▅▅▅▅▄▃▃▄▅▅▅▅▅▅▅▅  65% │
-│                                                                                │
-╰────────────────────────────────────────────────────────────────────────────────╯
-╭─ Memory ───────────────────────────────────────────────────────────────────────╮
-│                                                                                │
-│  RAM ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃  35% │
-│  SWP ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁   6% │
-│                                                                                │
-╰────────────────────────────────────────────────────────────────────────────────╯
-╭─ GPU ──────────────────────────────────────────────────────────────────────────╮
-│                                                                                │
-│  USE ▅▅▅▆▆▇▆▆▅▅▅▆▆▇▆▅▅▅▆▆▇▇▆▅▅▅▆▆▇▆▅▅▅▆▆▇▆▅▅▅▆▆▇▇▆▅▅▆▇▆▅▆▆▇▆▅▅  72% │
-│  MEM ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃  40% │
-│                                                                                │
-╰────────────────────────────────────────────────────────────────────────────────╯
-                                                                  q: quit  ttop v0.1
+╭─ CPU ───────────────────────────────────────────────────────────────────────────────────╮
+│                                     │                                                   │
+│   0 ▁▁▂▂▃▃▄▃▂▁▁▂▃▄▅▆▅▄▃▂▂▃▄  52% │ Tctl ▁▁▁▁▂▂▂▂▂▂▃▃▃▃▃▃▃▃▃▃▃  46°C (115°F)       │
+│   1 ▁▁▁▁▁▂▂▂▃▂▂▁▁▁▁▂▂▃▂▁▁▁▁  20% │                                                   │
+│   2 ▆▇▇█▇▇▆▇████▇▇█████▇▆▇▇  93% │                                                   │
+│   3 ▃▄▅▅▆▅▅▄▃▃▄▅▆▆▅▅▄▃▃▄▅▅▆  61% │                                                   │
+│   ...                              │                                                   │
+│  15 ▃▄▅▅▅▅▄▃▃▄▅▅▅▅▅▄▃▃▄▅▅▅▅  65% │                                                   │
+│                                     │                                                   │
+╰─────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Memory ────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                         │
+│  RAM ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃   35% │
+│  SWP ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁    6% │
+│                                                                                         │
+╰─────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ GPU ───────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                         │
+│  USE ▅▅▅▆▆▇▆▆▅▅▅▆▆▇▆▅▅▅▆▆▇▇▆▅▅▅▆▆▇▆▅▅▅▆▆▇▆▅▅▅▆▆▇▇▆▅▅▆▇▆▅▆▆▇▆▅▅▆▆▇▆▅▅▅▆▆▇   72% │
+│  MEM ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃   40% │
+│                                                                                         │
+╰─────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                        q: quit  ttop v0.1
+```
+
+**When no temperature sensors are found** (VMs, containers, etc.), the right half shows:
+
+```
+│  N/A ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁  N/A°C (N/A°F)  │
 ```
 
 ## Sections
 
 The screen is divided into independent boxed sections, stacked vertically:
 
-1. **CPU** — one sparkline row per logical processor (thread), labeled 0–N
-2. **Memory** — one row for RAM, one for swap
-3. **GPU** — one row for utilization, one for memory (GPU name in section title)
+1. **CPU** — split into two halves:
+   - **Left half:** one utilization sparkline row per logical processor (thread), labeled 0–N, with current percentage
+   - **Right half:** one temperature sparkline row per sensor (e.g., `Tctl` for AMD, `Core 0`–`Core N` for Intel), with dual °C/°F display
+   - A vertical `│` separator divides the halves
+   - Temperature rows are **top-aligned**: if there are fewer sensors than CPU cores, remaining right-half rows are blank
+   - If no sensors found: a single `N/A°C (N/A°F)` row with dim styling
+2. **Memory** (future) — one row for RAM, one for swap
+3. **GPU** (future) — one row for utilization, one for memory (GPU name in section title)
 
 Each section is enclosed in a box using Unicode box-drawing characters (`╭╮╰╯│─`) and has a labeled header. Sections are visually separated by the gap between boxes.
 
-Future widgets (temperatures, disk I/O, network, etc.) are added as new boxed sections without disturbing existing ones.
+Future widgets (disk I/O, network, etc.) are added as new boxed sections without disturbing existing ones.
 
 ## Sparkline Charts
 
@@ -95,15 +98,25 @@ Empty (no-data) positions render as a dim `▁` character to maintain the visual
 
 ## Row Format
 
-Each data row follows this structure:
+### Utilization Row (left half)
 
 ```
-{label}  {sparkline_chart}  {current_value}%
+│ {label} {sparkline_chart} {NNN}% │
 ```
 
 - **Label:** right-aligned, fixed width — `0`–`15` for CPU cores, `RAM`/`SWP` for memory, `USE`/`MEM` for GPU
-- **Sparkline:** variable width, fills available space
-- **Current value:** right-aligned 3-character percentage of the most recent data point, followed by `%`
+- **Sparkline:** variable width, fills available left-half space
+- **Current value:** right-aligned 3-character percentage
+
+### Temperature Row (right half)
+
+```
+ {label} {sparkline_chart} {NNN}°C ({NNN}°F) │
+```
+
+- **Label:** right-aligned, fixed width — sensor label (e.g., `Tctl`, `Core 0`)
+- **Sparkline:** variable width, fills available right-half space
+- **Current value:** dual Celsius/Fahrenheit display, or `N/A°C (N/A°F)` if unavailable
 
 ## Color Scheme
 
@@ -118,7 +131,27 @@ Each character in the sparkline is **independently colored** based on its own va
 | 51–75% | Orange | `\x1b[38;5;208m` (256-color orange) |
 | 76–100% | Red | `\x1b[31m` (standard red) |
 
-The same color thresholds apply to temperatures when they are added (with degree-based ranges instead of percentages).
+### Temperature Colors (per-character)
+
+Temperature sparklines use the same color gradient principle, with degree-based thresholds:
+
+| Temperature | Color | ANSI Code |
+|-------------|-------|-----------|
+| 0–49°C | Green | `\x1b[32m` (standard green) |
+| 50–69°C | Yellow | `\x1b[33m` (standard yellow) |
+| 70–84°C | Orange | `\x1b[38;5;208m` (256-color orange) |
+| 85°C+ | Red | `\x1b[31m` (standard red) |
+
+### Temperature Display Format
+
+Temperature values are shown in both Celsius and Fahrenheit:
+
+```
+46°C (115°F)      — normal reading, colored by temperature
+N/A°C (N/A°F)    — sensor unavailable, dim gray
+```
+
+Temperature sparklines map the range **30–100°C** to the 8 block characters (instead of 0–100% for utilization). Values below 30°C clamp to `▁`, values above 100°C clamp to `█`.
 
 ### Current Value Percentage
 

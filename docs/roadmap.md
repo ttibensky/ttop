@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-## Phase 1: CPU Utilization (current)
+## Phase 1: CPU Utilization ✓
 
 The first milestone — a working full-screen app that displays per-core CPU usage as sparkline charts.
 
@@ -15,19 +15,23 @@ The first milestone — a working full-screen app that displays per-core CPU usa
 7. **Main loop** — 1-second tick, key event polling (`q` / Ctrl+C to exit), full-screen alternate buffer
 8. **Terminal resize handling** — recalculate layout and resize buffers on `SIGWINCH`
 
-### What's NOT in Phase 1
+## Phase 2: CPU Temperature ✓
 
-- CPU temperatures
-- Memory (RAM / swap)
-- GPU utilization, memory, or temperature
+Side-by-side layout: utilization sparklines on the left half, temperature sparklines on the right half.
 
-These are displayed only as placeholder sections or omitted entirely until their respective phases.
+### Deliverables
 
-## Phase 2: CPU Temperature
-
-- Read thermal data from `/sys/class/hwmon/` (detect `coretemp` or `k10temp` driver)
-- Add a temperature sparkline per physical core (or alongside the utilization chart)
-- Define color thresholds for temperature (e.g., green < 50°C, yellow < 70°C, orange < 85°C, red >= 85°C)
+1. **Module restructure** — refactored `src/cpu.rs` into `src/cpu/mod.rs`, `src/cpu/utilization.rs`, `src/cpu/temperature.rs`
+2. **hwmon discovery** — auto-detect `k10temp` (AMD) or `coretemp` (Intel) driver under `/sys/class/hwmon/`
+3. **Sensor enumeration** — discover all `tempN_input` / `tempN_label` pairs for the matched device
+4. **Temperature reading** — read millidegree values from sysfs each tick, convert to °C
+5. **History buffers** — rolling `VecDeque<f64>` per sensor, same as utilization
+6. **Side-by-side layout** — CPU widget split in half with `│` vertical separator
+7. **Temperature sparklines** — range 30–100°C, same block characters as utilization
+8. **Temperature colors** — green (< 50°C), yellow (50–69°C), orange (70–84°C), red (≥ 85°C)
+9. **Dual display format** — `46°C (115°F)` next to each temp sparkline
+10. **N/A fallback** — `N/A°C (N/A°F)` with dim styling when no sensors found
+11. **Top-aligned rows** — temperature rows top-aligned on right; empty space below if fewer sensors than cores
 
 ## Phase 3: Memory
 
