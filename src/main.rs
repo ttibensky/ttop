@@ -12,8 +12,8 @@ use ttop::cpu::{CpuState, TempState};
 use ttop::gpu::GpuState;
 use ttop::memory::{MemState, MemTempState};
 use ttop::ui::{
-    gpu_abs_width, label_width, mem_abs_width, mem_col_chart_width, mem_temp_label_width,
-    render_frame, temp_chart_width, temp_label_width, util_chart_width,
+    core_columns, gpu_abs_width, label_width, mem_abs_width, mem_col_chart_width,
+    mem_temp_label_width, render_frame, temp_chart_width, temp_label_width, util_chart_width,
 };
 
 const TICK_INTERVAL: Duration = Duration::from_secs(1);
@@ -52,13 +52,16 @@ fn main() -> io::Result<()> {
 
         let (cols, rows) = terminal::size()?;
 
-        let available = (cols as usize).saturating_sub(4);
+        let core_cols = core_columns(cpu.core_count());
+        let num_util_cols = core_cols.len();
+        let num_borders = num_util_cols + 2;
+        let available = (cols as usize).saturating_sub(num_borders);
         let util_total = (available * 2) / 3;
         let temp_col = available - util_total;
-        let util_col1 = util_total / 2;
+        let util_sub_width = util_total / num_util_cols;
 
         let lw = label_width(cpu.core_count());
-        let ucw = util_chart_width(util_col1, lw);
+        let ucw = util_chart_width(util_sub_width, lw);
         cpu.update(ucw);
 
         let tlw = temp_label_width(&temp);

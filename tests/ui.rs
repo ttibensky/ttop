@@ -3,9 +3,9 @@ use ttop::cpu::utilization::CpuState;
 use ttop::gpu::GpuState;
 use ttop::memory::{MemState, MemTempState};
 use ttop::ui::{
-    label_width, mem_col_chart_width, render_frame, sparkline_char, sparkline_char_temp,
-    temp_chart_width, temperature_color, util_chart_width, utilization_color, COLOR_GREEN,
-    COLOR_ORANGE, COLOR_RED, COLOR_YELLOW, SPARKLINE_CHARS,
+    core_columns, label_width, mem_col_chart_width, render_frame, sparkline_char,
+    sparkline_char_temp, temp_chart_width, temperature_color, util_chart_width, utilization_color,
+    COLOR_GREEN, COLOR_ORANGE, COLOR_RED, COLOR_YELLOW, SPARKLINE_CHARS,
 };
 
 #[test]
@@ -367,6 +367,91 @@ fn render_frame_memory_has_three_column_subtitles() {
         stripped.contains("Swap Utilization"),
         "frame should contain 'Swap Utilization' subtitle"
     );
+}
+
+#[test]
+fn core_columns_zero() {
+    assert_eq!(core_columns(0), vec![0, 0]);
+}
+
+#[test]
+fn core_columns_one() {
+    assert_eq!(core_columns(1), vec![1, 0]);
+}
+
+#[test]
+fn core_columns_two() {
+    assert_eq!(core_columns(2), vec![1, 1]);
+}
+
+#[test]
+fn core_columns_three() {
+    assert_eq!(core_columns(3), vec![1, 1, 1]);
+}
+
+#[test]
+fn core_columns_four_falls_back_to_two() {
+    assert_eq!(core_columns(4), vec![2, 2]);
+}
+
+#[test]
+fn core_columns_five() {
+    assert_eq!(core_columns(5), vec![2, 2, 1]);
+}
+
+#[test]
+fn core_columns_six() {
+    assert_eq!(core_columns(6), vec![2, 2, 2]);
+}
+
+#[test]
+fn core_columns_seven() {
+    assert_eq!(core_columns(7), vec![3, 3, 1]);
+}
+
+#[test]
+fn core_columns_eight() {
+    assert_eq!(core_columns(8), vec![3, 3, 2]);
+}
+
+#[test]
+fn core_columns_twelve() {
+    assert_eq!(core_columns(12), vec![4, 4, 4]);
+}
+
+#[test]
+fn core_columns_sixteen() {
+    assert_eq!(core_columns(16), vec![6, 6, 4]);
+}
+
+#[test]
+fn core_columns_twenty_four() {
+    assert_eq!(core_columns(24), vec![8, 8, 8]);
+}
+
+#[test]
+fn core_columns_sum_equals_input() {
+    for n in 0..=128 {
+        let cols = core_columns(n);
+        assert_eq!(
+            cols.iter().sum::<usize>(),
+            n,
+            "core_columns({n}) = {cols:?} does not sum to {n}"
+        );
+    }
+}
+
+#[test]
+fn core_columns_no_empty_third_when_three_cols() {
+    for n in 0..=128 {
+        let cols = core_columns(n);
+        if cols.len() == 3 {
+            assert!(
+                cols[2] > 0,
+                "core_columns({n}) = {cols:?} has empty third column"
+            );
+        }
+    }
 }
 
 fn strip_ansi(s: &str) -> String {

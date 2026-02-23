@@ -61,6 +61,26 @@ pub fn label_width(core_count: usize) -> usize {
     1 + digits
 }
 
+/// Split cores across utilization sub-columns.
+///
+/// Tries a 3-column layout (ceil(n/3) per column, remainder in the last).
+/// Falls back to 2 columns when the third column would be empty.
+pub fn core_columns(core_count: usize) -> Vec<usize> {
+    if core_count == 0 {
+        return vec![0, 0];
+    }
+    let per = core_count.div_ceil(3);
+    let col1 = per;
+    let col2 = per.min(core_count.saturating_sub(per));
+    let col3 = core_count.saturating_sub(col1 + col2);
+    if col3 > 0 {
+        vec![col1, col2, col3]
+    } else {
+        let half = core_count.div_ceil(2);
+        vec![half, core_count.saturating_sub(half)]
+    }
+}
+
 pub fn temp_label_width(temp: &TempState) -> usize {
     if !temp.available() {
         return 3; // "N/A"
@@ -577,11 +597,9 @@ fn render_subtitle_line(
     buf: &mut String,
     util_title: &str,
     temp_title: &str,
-    util_col1: usize,
-    util_col2: usize,
+    util_span: usize,
     temp_col: usize,
 ) {
-    let util_span = util_col1 + 1 + util_col2;
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
 
     let util_pad = util_span.saturating_sub(util_title.len()) / 2;
@@ -609,97 +627,114 @@ fn render_subtitle_line(
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
 }
 
-fn render_separator_line(
-    buf: &mut String,
-    util_col1: usize,
-    util_col2: usize,
-    temp_col: usize,
-) {
-    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
-    for _ in 0..util_col1 {
-        buf.push(' ');
-    }
-    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
-    for _ in 0..util_col2 {
-        buf.push(' ');
-    }
-    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
-    for _ in 0..temp_col {
-        buf.push(' ');
+fn render_separator_line(buf: &mut String, col_widths: &[usize]) {
+    for &w in col_widths {
+        let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+        for _ in 0..w {
+            buf.push(' ');
+        }
     }
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
 }
 
 pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, mem_temp: &MemTempState, gpu: &GpuState, cols: u16, rows: u16) -> String {
-    // 3-column layout: │ util_col1 │ util_col2 │ temp_col │
-    let available = (cols as usize).saturating_sub(4);
+    let core_count = cpu.core_count();
+    let core_cols = core_columns(core_count);
+    let num_util_cols = core_cols.len();
+    // borders: left │ + one │ between each util col + │ between util/temp + right │
+    let num_borders = num_util_cols + 2;
+    let available = (cols as usize).saturating_sub(num_borders);
     let util_total = (available * 2) / 3;
     let temp_col = available - util_total;
-    let util_col1 = util_total / 2;
-    let util_col2 = util_total - util_col1;
 
-    let first_section = util_col1 + 1; // includes left │
-    let third_section = temp_col + 1; // includes right │
+    let util_widths: Vec<usize> = if num_util_cols == 3 {
+        let w1 = util_total / 3;
+        let w2 = util_total / 3;
+        let w3 = util_total - w1 - w2;
+        vec![w1, w2, w3]
+    } else {
+        let w1 = util_total / 2;
+        let w2 = util_total - w1;
+        vec![w1, w2]
+    };
 
-    let lw = label_width(cpu.core_count());
-    let ucw = util_chart_width(util_col1, lw);
+    let first_section = util_widths[0] + 1; // includes left │
+    let temp_section = temp_col + 1; // includes right │
+
+    let lw = label_width(core_count);
+    let ucw = util_chart_width(util_widths[0], lw);
 
     let tlw = temp_label_width(temp);
-    let tcw = temp_chart_width(third_section, tlw);
+    let tcw = temp_chart_width(temp_section, tlw);
 
-    let core_count = cpu.core_count();
-    let half = core_count.div_ceil(2);
+    // cumulative start indices per util column
+    let col_starts: Vec<usize> = {
+        let mut starts = vec![0];
+        let mut acc = 0;
+        for &c in &core_cols {
+            acc += c;
+            starts.push(acc);
+        }
+        starts
+    };
+
+    let max_cores_in_col = *core_cols.iter().max().unwrap_or(&0);
     let temp_rows = if temp.available() {
         temp.sensor_count()
     } else {
         1
     };
-    let row_count = half.max(temp_rows);
+    let row_count = max_cores_in_col.max(temp_rows);
 
     let mut buf = String::with_capacity((cols as usize) * (rows as usize));
     buf.push_str("\x1b[H");
 
     render_horizontal_border(&mut buf, '╭', '╮', cols, Some("CPU"));
-    render_subtitle_line(&mut buf, "Utilization", "Temperature", util_col1, util_col2, temp_col);
+    let util_span: usize = util_widths.iter().sum::<usize>() + (num_util_cols - 1);
+    render_subtitle_line(&mut buf, "Utilization", "Temperature", util_span, temp_col);
 
     for i in 0..row_count {
-        // First column: cores 0..half
-        if i < half {
-            let label = format!("#{}", i);
-            render_util_row(&mut buf, &label, lw, &cpu.histories[i], ucw, first_section);
+        // First util column (includes left │)
+        let idx = col_starts[0] + i;
+        if idx < col_starts[1] {
+            let label = format!("#{idx}");
+            render_util_row(&mut buf, &label, lw, &cpu.histories[idx], ucw, first_section);
         } else {
             render_empty_first_col(&mut buf, first_section);
         }
 
-        let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
-
-        // Second column: cores half..core_count
-        let second_idx = half + i;
-        if second_idx < core_count {
-            let label = format!("#{}", second_idx);
-            render_util_row_inner(&mut buf, &label, lw, &cpu.histories[second_idx], ucw, util_col2);
-        } else {
-            render_empty_col(&mut buf, util_col2);
+        // Remaining util columns
+        for c in 1..num_util_cols {
+            let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+            let idx = col_starts[c] + i;
+            if idx < col_starts[c + 1] {
+                let label = format!("#{idx}");
+                render_util_row_inner(&mut buf, &label, lw, &cpu.histories[idx], ucw, util_widths[c]);
+            } else {
+                render_empty_col(&mut buf, util_widths[c]);
+            }
         }
 
         let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
 
-        // Third column: temperature
+        // Temperature column
         if i < temp_rows {
             if temp.available() {
                 let labels = temp.labels();
-                render_temp_row(&mut buf, labels[i], tlw, &temp.histories[i], tcw, third_section);
+                render_temp_row(&mut buf, labels[i], tlw, &temp.histories[i], tcw, temp_section);
             } else {
-                render_na_temp_row(&mut buf, tlw, tcw, third_section);
+                render_na_temp_row(&mut buf, tlw, tcw, temp_section);
             }
         } else {
-            render_empty_right_half(&mut buf, third_section);
+            render_empty_right_half(&mut buf, temp_section);
         }
 
         buf.push_str("\r\n");
     }
 
-    render_separator_line(&mut buf, util_col1, util_col2, temp_col);
+    let mut all_col_widths: Vec<usize> = util_widths.clone();
+    all_col_widths.push(temp_col);
+    render_separator_line(&mut buf, &all_col_widths);
     render_horizontal_border(&mut buf, '╰', '╯', cols, None);
 
     // --- Memory section (three-column layout) ---
@@ -795,7 +830,7 @@ pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, mem_temp: 
         buf.push_str("\r\n");
     }
 
-    render_separator_line(&mut buf, mem_col1, mem_col2, mem_col3);
+    render_separator_line(&mut buf, &[mem_col1, mem_col2, mem_col3]);
     render_horizontal_border(&mut buf, '╰', '╯', cols, None);
 
     // --- GPU section (only when a GPU is detected) ---
@@ -832,7 +867,7 @@ pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, mem_temp: 
         render_gpu_temp_col_right(&mut buf, &gpu.temp_history, gpu_tcw, gpu_third_section);
         buf.push_str("\r\n");
 
-        render_separator_line(&mut buf, gpu_col1, gpu_col2, gpu_col3);
+        render_separator_line(&mut buf, &[gpu_col1, gpu_col2, gpu_col3]);
         render_horizontal_border(&mut buf, '╰', '╯', cols, None);
         5
     } else {
