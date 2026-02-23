@@ -14,8 +14,7 @@ ttop is a lightweight alternative to `top` and `htop` focused on displaying real
 
 | Metric | Detail |
 |--------|--------|
-| **CPU** | Per-core utilization (all logical processors) |
-| **CPU Temperature** | Per-core thermal readings |
+| **CPU** | Per-core utilization and per-core temperature readings (all logical processors) |
 | **Memory** | RAM and swap usage |
 | **GPU** | Utilization, memory, and temperature |
 
