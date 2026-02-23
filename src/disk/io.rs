@@ -161,15 +161,8 @@ impl DiskIoState {
     }
 
     pub fn rate_width(&self) -> usize {
-        let mut max_w = 6; // minimum "0B/s" width
-        for i in 0..self.devices.len() {
-            if let Some(&v) = self.read_histories[i].back() {
-                max_w = max_w.max(format_rate(v).len());
-            }
-            if let Some(&v) = self.write_histories[i].back() {
-                max_w = max_w.max(format_rate(v).len());
-            }
-        }
-        max_w
+        // Fixed width covering the widest format_rate output (e.g. "1023.9MB/s")
+        // to keep the chart width stable as throughput fluctuates.
+        10
     }
 }

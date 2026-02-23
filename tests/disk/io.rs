@@ -174,6 +174,43 @@ fn disk_io_state_label_width_at_least_four() {
     assert!(state.label_width() >= 4);
 }
 
+#[test]
+fn disk_io_state_rate_width_is_fixed() {
+    let state = DiskIoState::new();
+    assert_eq!(state.rate_width(), 10);
+}
+
+#[test]
+fn format_rate_fits_within_rate_width() {
+    let state = DiskIoState::new();
+    let rw = state.rate_width();
+
+    let test_values: &[f64] = &[
+        0.0,
+        1.0,
+        512.0,
+        1023.0,
+        1024.0,
+        10240.0,
+        500.0 * 1024.0,
+        1023.9 * 1024.0,
+        1024.0 * 1024.0,
+        45.2 * 1024.0 * 1024.0,
+        500.0 * 1024.0 * 1024.0,
+        1023.9 * 1024.0 * 1024.0,
+        1024.0 * 1024.0 * 1024.0,
+        10.0 * 1024.0 * 1024.0 * 1024.0,
+    ];
+    for &v in test_values {
+        let text = format_rate(v);
+        assert!(
+            text.len() <= rw,
+            "format_rate({v}) = \"{text}\" ({} chars) exceeds rate_width {rw}",
+            text.len()
+        );
+    }
+}
+
 // --- sparkline_char_scaled ---
 
 #[test]
