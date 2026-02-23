@@ -12,8 +12,8 @@ use ttop::cpu::{CpuState, TempState};
 use ttop::gpu::GpuState;
 use ttop::memory::{MemState, MemTempState};
 use ttop::ui::{
-    gpu_abs_width, gpu_chart_width, label_width, mem_abs_width, mem_col_chart_width,
-    mem_temp_label_width, render_frame, temp_chart_width, temp_label_width, util_chart_width,
+    gpu_abs_width, label_width, mem_abs_width, mem_col_chart_width, mem_temp_label_width,
+    render_frame, temp_chart_width, temp_label_width, util_chart_width,
 };
 
 const TICK_INTERVAL: Duration = Duration::from_secs(1);
@@ -78,10 +78,15 @@ fn main() -> io::Result<()> {
         let mtcw = temp_chart_width(mem_third_section, mtlw);
         mem_temp.update(mtcw);
 
-        let total_inner = (cols as usize).saturating_sub(2);
+        let gpu_avail = (cols as usize).saturating_sub(4);
+        let gpu_col1 = gpu_avail / 3;
+        let gpu_col2 = gpu_avail / 3;
+        let gpu_col3 = gpu_avail - gpu_col1 - gpu_col2;
         let gaw = gpu_abs_width(&gpu);
-        let gcw = gpu_chart_width(total_inner, gaw);
-        gpu.update(gcw);
+        let gpu_ucw = util_chart_width(gpu_col1, 3);
+        let gpu_mcw = mem_col_chart_width(gpu_col2, gaw);
+        let gpu_tcw = temp_chart_width(gpu_col3 + 1, 3);
+        gpu.update(gpu_ucw.max(gpu_mcw).max(gpu_tcw));
 
         let frame = render_frame(&cpu, &temp, &mem, &mem_temp, &gpu, cols, rows);
         stdout.write_all(frame.as_bytes())?;

@@ -24,11 +24,10 @@ The CPU section uses a **three-column layout**: the first two thirds display uti
 │ RAM ▃▃▃▃▃▃▃▃▃  5.1GB/16.0GB  35% │ SWP ▁▁▁▁▁▁▁▁▁  0.5GB/8.0GB   6% │ N/A ▁▁▁▁  N/A°C (N/A°F)  │
 │                            │                             │                              │
 ╰─────────────────────────────────────────────────────────────────────────────────────────╯
-╭─ GPU ───────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                         │
-│  USE ▅▅▅▆▆▇▆▆▅▅▅▆▆▇▆▅▅▅▆▆▇▇▆▅▅▅▆▆▇▆▅▅▅▆▆▇▆▅▅▅▆▆▇▇▆▅▅▆▇▆▅▆▆▇▆▅▅▆▆▇▆▅▅▅▆▆▇   72% │
-│  MEM ▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃   40% │
-│                                                                                         │
+╭─ GPU: NVIDIA GeForce RTX 4090 ──────────────────────────────────────────────────────────╮
+│      GPU Utilization       │      VRAM Utilization       │         Temperature          │
+│ USE ▅▅▅▆▆▇▆▆▅▅▅▆▆▇  72%  │ MEM ▃▃▃▃▃▃  4.2GB/24.0GB  40% │ TMP ▃▃▃▃▃▃  52°C (126°F)│
+│                            │                             │                              │
 ╰─────────────────────────────────────────────────────────────────────────────────────────╯
                                                                         q: quit  ttop v0.1
 ```
@@ -60,12 +59,14 @@ The screen is divided into independent boxed sections, stacked vertically:
    - If no DIMM sensors found: a single `N/A°C (N/A°F)` row with dim styling
    - Uses `utilization_color()` for RAM/SWAP sparklines, `temperature_color()` and `sparkline_char_temp()` for DIMM temperatures
    - When swap is disabled (`SwapTotal == 0`): SWP column renders entirely in dim gray with `0.0GB/0.0GB   0%`
-3. **GPU** — full-width section with three sparkline rows (only rendered when a GPU is detected):
-   - **USE row:** GPU utilization percentage, uses `utilization_color()` thresholds
-   - **MEM row:** GPU memory usage percentage + absolute values (`usedU/totalU`), uses `utilization_color()`
-   - **TMP row:** GPU temperature sparkline with dual °C/°F display, uses `temperature_color()` and `sparkline_char_temp()`
+3. **GPU** — three-column layout (equal thirds), same structure as the Memory section (only rendered when a GPU is detected):
+   - **First third (GPU Utilization):** subtitle "GPU Utilization" (bold cyan, centered), one sparkline row with `USE` label and percentage
+   - **Second third (VRAM Utilization):** subtitle "VRAM Utilization" (bold cyan, centered), one sparkline row with `MEM` label, absolute values (`usedU/totalU`), and percentage
+   - **Third third (Temperature):** subtitle "Temperature" (bold cyan, centered), one sparkline row with `TMP` label and dual °C/°F display
+   - Vertical `│` separators divide the three columns
    - GPU product name displayed in section title: `╭─ GPU: <name> ─╮`
    - When no GPU is detected, the entire section is omitted
+   - When temperature is unavailable: TMP column shows `N/A°C (N/A°F)` with dim styling
 
 Each section is enclosed in a box using Unicode box-drawing characters (`╭╮╰╯│─`) and has a labeled header. Sections are visually separated by the gap between boxes.
 

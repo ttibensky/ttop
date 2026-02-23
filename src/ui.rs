@@ -136,24 +136,11 @@ pub fn gpu_abs_width(gpu: &GpuState) -> usize {
     text.len()
 }
 
-/// Compute the chart width for a full-width GPU row.
-/// Must accommodate MEM row (same as memory: 13 + abs_w) and TMP row (20 fixed).
-pub fn gpu_chart_width(inner_cols: usize, abs_w: usize) -> usize {
-    let mem_fixed = 13 + abs_w;
-    let temp_fixed = 20;
-    let fixed = mem_fixed.max(temp_fixed);
-    if inner_cols > fixed {
-        inner_cols - fixed
-    } else {
-        8
-    }
-}
-
-fn render_gpu_util_row(
+fn render_gpu_util_col_first(
     buf: &mut String,
     history: &VecDeque<f64>,
     cw: usize,
-    inner: usize,
+    section_width: usize,
 ) {
     let current_pct = history.back().copied().unwrap_or(0.0);
     let color = utilization_color(current_pct);
@@ -176,24 +163,23 @@ fn render_gpu_util_row(
     let _ = write!(buf, " {color}{:>3.0}%{COLOR_RESET}", current_pct);
 
     let used = 2 + 3 + 1 + cw + 1 + 4;
-    let pad = inner.saturating_sub(used);
+    let pad = section_width.saturating_sub(used);
     for _ in 0..pad {
         buf.push(' ');
     }
-    let _ = write!(buf, " {COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
 }
 
-fn render_gpu_mem_row(
+fn render_gpu_mem_col_inner(
     buf: &mut String,
     history: &VecDeque<f64>,
     cw: usize,
     abs_formatted: &str,
-    inner: usize,
+    col_width: usize,
 ) {
     let current_pct = history.back().copied().unwrap_or(0.0);
     let color = utilization_color(current_pct);
 
-    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET} ");
+    let _ = write!(buf, " ");
     let _ = write!(buf, "{COLOR_WHITE}MEM{COLOR_RESET} ");
 
     let data_len = history.len();
@@ -212,21 +198,20 @@ fn render_gpu_mem_row(
     let _ = write!(buf, " {color}{abs_formatted}{COLOR_RESET}");
     let _ = write!(buf, "  {color}{:>3.0}%{COLOR_RESET}", current_pct);
 
-    let used = 2 + 3 + 1 + cw + 1 + abs_w + 2 + 4;
-    let pad = inner.saturating_sub(used);
+    let used = 1 + 3 + 1 + cw + 1 + abs_w + 2 + 4;
+    let pad = col_width.saturating_sub(used);
     for _ in 0..pad {
         buf.push(' ');
     }
-    let _ = write!(buf, " {COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
 }
 
-fn render_gpu_temp_row(
+fn render_gpu_temp_col_right(
     buf: &mut String,
     history: &VecDeque<f64>,
     cw: usize,
-    inner: usize,
+    half_width: usize,
 ) {
-    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET} ");
+    let _ = write!(buf, " ");
     let _ = write!(buf, "{COLOR_WHITE}TMP{COLOR_RESET} ");
 
     let data_len = history.len();
@@ -249,13 +234,40 @@ fn render_gpu_temp_row(
         let _ = write!(buf, " {COLOR_DIM_GRAY}N/A°C (N/A°F){COLOR_RESET}");
     }
 
-    // 2 + 3 + 1 + cw + 14 = 20 + cw
-    let used = 20 + cw;
-    let pad = inner.saturating_sub(used);
+    let used = 1 + 3 + 1 + cw + 14;
+    let pad = half_width.saturating_sub(used + 2);
     for _ in 0..pad {
         buf.push(' ');
     }
-    let _ = write!(buf, " {COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
+    let _ = write!(buf, " {COLOR_DIM_GRAY}│{COLOR_RESET}");
+}
+
+fn render_gpu_subtitle_line(
+    buf: &mut String,
+    col1: usize,
+    col2: usize,
+    col3: usize,
+) {
+    let titles = [
+        ("GPU Utilization", col1),
+        ("VRAM Utilization", col2),
+        ("Temperature", col3),
+    ];
+
+    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+    for (title, col_width) in titles {
+        let pad_left = col_width.saturating_sub(title.len()) / 2;
+        let pad_right = col_width.saturating_sub(pad_left + title.len());
+        for _ in 0..pad_left {
+            buf.push(' ');
+        }
+        let _ = write!(buf, "{COLOR_BOLD_CYAN}{title}{COLOR_RESET}");
+        for _ in 0..pad_right {
+            buf.push(' ');
+        }
+        let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+    }
+    buf.push_str("\r\n");
 }
 
 fn render_util_row(
@@ -537,15 +549,6 @@ fn render_mem_subtitle_line(
     buf.push_str("\r\n");
 }
 
-fn render_mem_separator(buf: &mut String, cols: u16) {
-    let inner = (cols as usize).saturating_sub(2);
-    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
-    for _ in 0..inner {
-        buf.push(' ');
-    }
-    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
-}
-
 fn render_horizontal_border(
     buf: &mut String,
     left: char,
@@ -795,12 +798,20 @@ pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, mem_temp: 
     render_separator_line(&mut buf, mem_col1, mem_col2, mem_col3);
     render_horizontal_border(&mut buf, '╰', '╯', cols, None);
 
-    let total_inner = (cols as usize).saturating_sub(2);
-
     // --- GPU section (only when a GPU is detected) ---
     let gpu_lines = if gpu.available() {
+        let gpu_avail = (cols as usize).saturating_sub(4);
+        let gpu_col1 = gpu_avail / 3;
+        let gpu_col2 = gpu_avail / 3;
+        let gpu_col3 = gpu_avail - gpu_col1 - gpu_col2;
+
+        let gpu_first_section = gpu_col1 + 1;
+        let gpu_third_section = gpu_col3 + 1;
+
         let gaw = gpu_abs_width(gpu);
-        let gcw = gpu_chart_width(total_inner, gaw);
+        let gpu_ucw = util_chart_width(gpu_col1, 3);
+        let gpu_mcw = mem_col_chart_width(gpu_col2, gaw);
+        let gpu_tcw = temp_chart_width(gpu_third_section, 3);
 
         let mem_used_kb = gpu.current_mem_used_kb;
         let mem_total_kb = gpu.current_mem_total_kb;
@@ -812,19 +823,18 @@ pub fn render_frame(cpu: &CpuState, temp: &TempState, mem: &MemState, mem_temp: 
 
         let title = format!("GPU: {}", gpu.name);
         render_horizontal_border(&mut buf, '╭', '╮', cols, Some(&title));
-        render_mem_separator(&mut buf, cols);
-        render_gpu_util_row(&mut buf, &gpu.util_history, gcw, total_inner);
-        render_gpu_mem_row(&mut buf, &gpu.mem_history, gcw, &gpu_mem_abs, total_inner);
-        if gpu.has_temperature() {
-            render_gpu_temp_row(&mut buf, &gpu.temp_history, gcw, total_inner);
-            render_mem_separator(&mut buf, cols);
-            render_horizontal_border(&mut buf, '╰', '╯', cols, None);
-            7
-        } else {
-            render_mem_separator(&mut buf, cols);
-            render_horizontal_border(&mut buf, '╰', '╯', cols, None);
-            6
-        }
+        render_gpu_subtitle_line(&mut buf, gpu_col1, gpu_col2, gpu_col3);
+
+        render_gpu_util_col_first(&mut buf, &gpu.util_history, gpu_ucw, gpu_first_section);
+        let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+        render_gpu_mem_col_inner(&mut buf, &gpu.mem_history, gpu_mcw, &gpu_mem_abs, gpu_col2);
+        let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+        render_gpu_temp_col_right(&mut buf, &gpu.temp_history, gpu_tcw, gpu_third_section);
+        buf.push_str("\r\n");
+
+        render_separator_line(&mut buf, gpu_col1, gpu_col2, gpu_col3);
+        render_horizontal_border(&mut buf, '╰', '╯', cols, None);
+        5
     } else {
         0
     };

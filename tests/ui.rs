@@ -3,9 +3,9 @@ use ttop::cpu::utilization::CpuState;
 use ttop::gpu::GpuState;
 use ttop::memory::{MemState, MemTempState};
 use ttop::ui::{
-    gpu_chart_width, label_width, mem_col_chart_width, render_frame, sparkline_char,
-    sparkline_char_temp, temp_chart_width, temperature_color, util_chart_width, utilization_color,
-    COLOR_GREEN, COLOR_ORANGE, COLOR_RED, COLOR_YELLOW, SPARKLINE_CHARS,
+    label_width, mem_col_chart_width, render_frame, sparkline_char, sparkline_char_temp,
+    temp_chart_width, temperature_color, util_chart_width, utilization_color, COLOR_GREEN,
+    COLOR_ORANGE, COLOR_RED, COLOR_YELLOW, SPARKLINE_CHARS,
 };
 
 #[test]
@@ -367,26 +367,6 @@ fn render_frame_memory_has_three_column_subtitles() {
         stripped.contains("Swap Utilization"),
         "frame should contain 'Swap Utilization' subtitle"
     );
-}
-
-#[test]
-fn gpu_chart_width_standard() {
-    let cw = gpu_chart_width(100, 11);
-    // mem_fixed = 13 + 11 = 24, temp_fixed = 20, max = 24
-    assert_eq!(cw, 100 - 24);
-}
-
-#[test]
-fn gpu_chart_width_small_abs() {
-    let cw = gpu_chart_width(100, 5);
-    // mem_fixed = 13 + 5 = 18, temp_fixed = 20, max = 20
-    assert_eq!(cw, 100 - 20);
-}
-
-#[test]
-fn gpu_chart_width_very_narrow() {
-    let cw = gpu_chart_width(10, 11);
-    assert_eq!(cw, 8);
 }
 
 fn strip_ansi(s: &str) -> String {

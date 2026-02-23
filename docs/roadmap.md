@@ -67,7 +67,7 @@ Redesigned Memory section from full-width to three-column layout (equal thirds):
 
 ## Phase 4: GPU ✓
 
-Full-width "GPU" section box below Memory, with utilization, memory, and temperature sparklines. GPU name displayed in the section title. Section hidden entirely when no GPU is detected.
+Three-column "GPU" section box below Memory, with GPU Utilization, VRAM Utilization, and Temperature each in one-third columns on a single line. GPU name displayed in the section title. Section hidden entirely when no GPU is detected.
 
 ### Deliverables
 
@@ -76,10 +76,10 @@ Full-width "GPU" section box below Memory, with utilization, memory, and tempera
 3. **NVIDIA backend (`src/gpu/nvidia.rs`)** — `detect()` queries `nvidia-smi --query-gpu=name`; `read_snapshot()` queries utilization, memory used/total, and temperature in a single call
 4. **AMD backend (`src/gpu/amd.rs`)** — `detect()` scans `/sys/class/drm/card*/device/vendor` for `0x1002`; reads `gpu_busy_percent`, `mem_info_vram_used/total` from sysfs; temperature via hwmon `amdgpu` driver
 5. **GPU name in title** — section header renders as `╭─ GPU: <name> ─╮`
-6. **Three sparkline rows** — `USE` (utilization %), `MEM` (memory % + absolute values), `TMP` (temperature °C/°F)
-7. **Chart width calculation** — `gpu_chart_width()` accounts for widest row (MEM with absolute values or TMP with °C/°F display)
-8. **Color reuse** — USE and MEM rows use `utilization_color()`; TMP row uses `temperature_color()` and `sparkline_char_temp()`
-9. **Graceful degradation** — section not rendered when no GPU detected; temperature row shows N/A if no hwmon found
+6. **Three-column layout** — `USE` (utilization %) in first third, `MEM` (memory % + absolute values) in second third, `TMP` (temperature °C/°F) in last third, separated by `│` dividers with centered bold cyan subtitles
+7. **Per-column chart widths** — each column computes its own chart width using existing `util_chart_width`, `mem_col_chart_width`, and `temp_chart_width` functions; histories trimmed to the maximum of all three
+8. **Color reuse** — USE and MEM columns use `utilization_color()`; TMP column uses `temperature_color()` and `sparkline_char_temp()`
+9. **Graceful degradation** — section not rendered when no GPU detected; temperature column shows `N/A°C (N/A°F)` if no hwmon found
 
 ## Phase 5: Disk (Space + I/O)
 
