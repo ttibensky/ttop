@@ -55,7 +55,7 @@ pub fn label_width(core_count: usize) -> usize {
     } else {
         (max_id as f64).log10().floor() as usize + 1
     };
-    digits.max(2)
+    1 + digits
 }
 
 pub fn temp_label_width(temp: &TempState) -> usize {
@@ -101,7 +101,7 @@ fn render_util_row(
     let current_color = utilization_color(current_pct);
 
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET} ");
-    let _ = write!(buf, "{COLOR_WHITE}{:>width$}{COLOR_RESET} ", label, width = lw);
+    let _ = write!(buf, "{COLOR_WHITE}{:<width$}{COLOR_RESET} ", label, width = lw);
 
     let data_len = history.len();
     let empty_slots = cw.saturating_sub(data_len);
@@ -257,7 +257,7 @@ pub fn render_frame(cpu: &CpuState, temp: &TempState, cols: u16, rows: u16) -> S
     render_separator_line(&mut buf, left_half, cols);
 
     for i in 0..row_count {
-        let label = format!("{}", i);
+        let label = format!("#{}", i);
         render_util_row(&mut buf, &label, lw, &cpu.histories[i], lcw, left_half);
 
         let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");

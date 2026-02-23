@@ -141,27 +141,27 @@ fn label_width_ten_cores() {
 
 #[test]
 fn label_width_eleven_cores() {
-    assert_eq!(label_width(11), 2);
+    assert_eq!(label_width(11), 3);
 }
 
 #[test]
 fn label_width_hundred_cores() {
-    assert_eq!(label_width(100), 2);
+    assert_eq!(label_width(100), 3);
 }
 
 #[test]
 fn label_width_hundred_one_cores() {
-    assert_eq!(label_width(101), 3);
+    assert_eq!(label_width(101), 4);
 }
 
 #[test]
 fn label_width_thousand_cores() {
-    assert_eq!(label_width(1000), 3);
+    assert_eq!(label_width(1000), 4);
 }
 
 #[test]
 fn label_width_thousand_one_cores() {
-    assert_eq!(label_width(1001), 4);
+    assert_eq!(label_width(1001), 5);
 }
 
 #[test]
@@ -215,8 +215,8 @@ fn render_frame_contains_all_core_labels() {
     let stripped = strip_ansi(&frame);
     for i in 0..cpu.core_count() {
         assert!(
-            stripped.contains(&format!("{}", i)),
-            "frame should contain label for core {}",
+            stripped.contains(&format!("#{}", i)),
+            "frame should contain label for core #{}",
             i
         );
     }

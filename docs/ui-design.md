@@ -11,12 +11,12 @@ The CPU section uses a **side-by-side layout**: utilization sparklines on the le
 ```
 ╭─ CPU ───────────────────────────────────────────────────────────────────────────────────╮
 │                                     │                                                   │
-│   0 ▁▁▂▂▃▃▄▃▂▁▁▂▃▄▅▆▅▄▃▂▂▃▄  52% │ Tctl ▁▁▁▁▂▂▂▂▂▂▃▃▃▃▃▃▃▃▃▃▃  46°C (115°F)       │
-│   1 ▁▁▁▁▁▂▂▂▃▂▂▁▁▁▁▂▂▃▂▁▁▁▁  20% │                                                   │
-│   2 ▆▇▇█▇▇▆▇████▇▇█████▇▆▇▇  93% │                                                   │
-│   3 ▃▄▅▅▆▅▅▄▃▃▄▅▆▆▅▅▄▃▃▄▅▅▆  61% │                                                   │
-│   ...                              │                                                   │
-│  15 ▃▄▅▅▅▅▄▃▃▄▅▅▅▅▅▄▃▃▄▅▅▅▅  65% │                                                   │
+│ #0  ▁▁▂▂▃▃▄▃▂▁▁▂▃▄▅▆▅▄▃▂▂▃▄  52% │ Tctl ▁▁▁▁▂▂▂▂▂▂▃▃▃▃▃▃▃▃▃▃▃  46°C (115°F)       │
+│ #1  ▁▁▁▁▁▂▂▂▃▂▂▁▁▁▁▂▂▃▂▁▁▁▁  20% │                                                   │
+│ #2  ▆▇▇█▇▇▆▇████▇▇█████▇▆▇▇  93% │                                                   │
+│ #3  ▃▄▅▅▆▅▅▄▃▃▄▅▆▆▅▅▄▃▃▄▅▅▆  61% │                                                   │
+│ ...                                │                                                   │
+│ #15 ▃▄▅▅▅▅▄▃▃▄▅▅▅▅▅▄▃▃▄▅▅▅▅  65% │                                                   │
 │                                     │                                                   │
 ╰─────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─ Memory ────────────────────────────────────────────────────────────────────────────────╮
@@ -104,7 +104,7 @@ Empty (no-data) positions render as a dim `▁` character to maintain the visual
 │ {label} {sparkline_chart} {NNN}% │
 ```
 
-- **Label:** right-aligned, fixed width — `0`–`15` for CPU cores, `RAM`/`SWP` for memory, `USE`/`MEM` for GPU
+- **Label:** left-aligned, fixed width — `#0`–`#15` for CPU cores (with trailing space padding), `RAM`/`SWP` for memory, `USE`/`MEM` for GPU
 - **Sparkline:** variable width, fills available left-half space
 - **Current value:** right-aligned 3-character percentage
 
