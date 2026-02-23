@@ -2,6 +2,8 @@
 
 A minimal, full-screen terminal system monitor for Linux, written in Rust.
 
+> **Disclaimer:** This is a fun, vibe-coded side project — not intended for real-world or production use. Use it at your own risk and discretion. No guarantees of correctness, stability, or fitness for any purpose are provided.
+
 ![ttop screenshot](docs/ttop.png)
 
 ## What is ttop?
