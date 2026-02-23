@@ -218,6 +218,43 @@ fn render_horizontal_border(
     let _ = write!(buf, "{right}{COLOR_RESET}\r\n");
 }
 
+fn render_subtitle_line(
+    buf: &mut String,
+    left_title: &str,
+    right_title: &str,
+    left_half: usize,
+    terminal_cols: u16,
+) {
+    let left_inner = left_half.saturating_sub(1); // exclude left border
+    let right_inner = (terminal_cols as usize).saturating_sub(left_half + 2); // exclude center + right borders
+
+    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+
+    let left_pad = left_inner.saturating_sub(left_title.len()) / 2;
+    let left_remaining = left_inner.saturating_sub(left_pad + left_title.len());
+    for _ in 0..left_pad {
+        buf.push(' ');
+    }
+    let _ = write!(buf, "{COLOR_BOLD_CYAN}{left_title}{COLOR_RESET}");
+    for _ in 0..left_remaining {
+        buf.push(' ');
+    }
+
+    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
+
+    let right_pad = right_inner.saturating_sub(right_title.len()) / 2;
+    let right_remaining = right_inner.saturating_sub(right_pad + right_title.len());
+    for _ in 0..right_pad {
+        buf.push(' ');
+    }
+    let _ = write!(buf, "{COLOR_BOLD_CYAN}{right_title}{COLOR_RESET}");
+    for _ in 0..right_remaining {
+        buf.push(' ');
+    }
+
+    let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}\r\n");
+}
+
 fn render_separator_line(buf: &mut String, left_half: usize, terminal_cols: u16) {
     let _ = write!(buf, "{COLOR_DIM_GRAY}│{COLOR_RESET}");
     for _ in 0..left_half.saturating_sub(1) {
@@ -254,7 +291,7 @@ pub fn render_frame(cpu: &CpuState, temp: &TempState, cols: u16, rows: u16) -> S
 
     // CPU section top border
     render_horizontal_border(&mut buf, '╭', '╮', cols, Some("CPU"));
-    render_separator_line(&mut buf, left_half, cols);
+    render_subtitle_line(&mut buf, "Utilization", "Temperature", left_half, cols);
 
     for i in 0..row_count {
         let label = format!("#{}", i);

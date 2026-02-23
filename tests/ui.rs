@@ -198,6 +198,22 @@ fn render_frame_contains_cpu_section() {
 }
 
 #[test]
+fn render_frame_contains_subtitles() {
+    let cpu = CpuState::new();
+    let temp = TempState::new();
+    let frame = render_frame(&cpu, &temp, 120, 40);
+    let stripped = strip_ansi(&frame);
+    assert!(
+        stripped.contains("Utilization"),
+        "frame should contain 'Utilization' subtitle"
+    );
+    assert!(
+        stripped.contains("Temperature"),
+        "frame should contain 'Temperature' subtitle"
+    );
+}
+
+#[test]
 fn render_frame_contains_status_bar() {
     let cpu = CpuState::new();
     let temp = TempState::new();

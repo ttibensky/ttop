@@ -10,7 +10,7 @@ The CPU section uses a **side-by-side layout**: utilization sparklines on the le
 
 ```
 ╭─ CPU ───────────────────────────────────────────────────────────────────────────────────╮
-│                                     │                                                   │
+│           Utilization               │              Temperature                          │
 │ #0  ▁▁▂▂▃▃▄▃▂▁▁▂▃▄▅▆▅▄▃▂▂▃▄  52% │ Tctl ▁▁▁▁▂▂▂▂▂▂▃▃▃▃▃▃▃▃▃▃▃  46°C (115°F)       │
 │ #1  ▁▁▁▁▁▂▂▂▃▂▂▁▁▁▁▂▂▃▂▁▁▁▁  20% │                                                   │
 │ #2  ▆▇▇█▇▇▆▇████▇▇█████▇▆▇▇  93% │                                                   │
@@ -45,8 +45,8 @@ The CPU section uses a **side-by-side layout**: utilization sparklines on the le
 The screen is divided into independent boxed sections, stacked vertically:
 
 1. **CPU** — split into two halves:
-   - **Left half:** one utilization sparkline row per logical processor (thread), labeled 0–N, with current percentage
-   - **Right half:** one temperature sparkline row per sensor (e.g., `Tctl` for AMD, `Core 0`–`Core N` for Intel), with dual °C/°F display
+   - **Left half:** subtitle "Utilization" (bold cyan, centered), then one utilization sparkline row per logical processor (thread), labeled `#0`–`#N`, with current percentage
+   - **Right half:** subtitle "Temperature" (bold cyan, centered), then one temperature sparkline row per sensor (e.g., `Tctl` for AMD, `Core 0`–`Core N` for Intel), with dual °C/°F display
    - A vertical `│` separator divides the halves
    - Temperature rows are **top-aligned**: if there are fewer sensors than CPU cores, remaining right-half rows are blank
    - If no sensors found: a single `N/A°C (N/A°F)` row with dim styling
